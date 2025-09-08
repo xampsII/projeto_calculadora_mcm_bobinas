@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">
+  <NFe>
+    <infNFe Id="NFe35230567307728000123550010000010506730772890" versao="4.00">
+      <ide>
+        <cUF>35</cUF>
+        <cNF>10506730</cNF>
+        <natOp>COMPRA MP ST/ANTERIOR SI IPI</natOp>
+        <mod>55</mod>
+        <serie>0PF</serie>
+        <nNF>105067</nNF>
+        <dhEmi>2025-06-24T10:00:00-03:00</dhEmi>
+        <tpNF>0</tpNF>
+        <idDest>1</idDest>
+        <cMunFG>3550308</cMunFG>
+        <tpImp>1</tpImp>
+        <tpEmis>1</tpEmis>
+        <cDV>1</cDV>
+        <tpAmb>2</tpAmb>
+        <finNFe>1</finNFe>
+        <indFinal>1</indFinal>
+        <indPres>1</indPres>
+        <procEmi>0</procEmi>
+        <verProc>4.00</verProc>
+      </ide>
+      <emit>
+        <CNPJ>67307728000123</CNPJ>
+        <xNome>NASA ISOLANTES ELÉTRICOS LTDA</xNome>
+        <xFant>NASA ISOLANTES</xFant>
+        <enderEmit>
+          <xLgr>RUA LUIZ ANTONIO DE ANDRADE VIEIRA</xLgr>
+          <nro>1225</nro>
+          <xBairro>JD GUACIARA</xBairro>
+          <cMun>3550308</cMun>
+          <xMun>TABOAO DA SERRA</xMun>
+          <UF>SP</UF>
+          <CEP>06783280</CEP>
+          <cPais>1058</cPais>
+          <xPais>BRASIL</xPais>
+        </enderEmit>
+        <IE>675073279115</IE>
+        <CRT>1</CRT>
+      </emit>
+      <dest>
+        <CNPJ>68330141000106</CNPJ>
+        <xNome>M.C.M. BOBINAS IND. COM. IMP. E EXP. LTDA.</xNome>
+        <enderDest>
+          <xLgr>RUA LUIZ JOSÉ SANGALETTI</xLgr>
+          <nro>2029</nro>
+          <xBairro>DISTRITO INDUSTRIAL</xBairro>
+          <cMun>3550308</cMun>
+          <xMun>PEDERNEIRAS</xMun>
+          <UF>SP</UF>
+          <CEP>17284602</CEP>
+          <cPais>1058</cPais>
+          <xPais>BRASIL</xPais>
+        </enderDest>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>000476</cProd>
+          <xProd>VERNIZ ASA 952 INCOLOR</xProd>
+          <NCM>85118090</NCM>
+          <CFOP>1401</CFOP>
+          <uCom>LT</uCom>
+          <qCom>4.0000</qCom>
+          <vUnCom>770.0000000000</vUnCom>
+          <vProd>3080.00</vProd>
+          <uTrib>LT</uTrib>
+          <qTrib>4.0000</qTrib>
+          <vUnTrib>770.0000000000</vUnTrib>
+        </prod>
+        <imposto>
+          <ICMS>
+            <ICMS50>
+              <orig>0</orig>
+              <CST>50</CST>
+              <modBC>0</modBC>
+              <vBC>0.00</vBC>
+              <pICMS>0.00</pICMS>
+              <vICMS>0.00</vICMS>
+            </ICMS50>
+          </ICMS>
+        </imposto>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>000195</cProd>
+          <xProd>VERNIZ NASA AM-VERNIZ ASA 952 AMARELO</xProd>
+          <NCM>85118090</NCM>
+          <CFOP>1401</CFOP>
+          <uCom>LT</uCom>
+          <qCom>4.0000</qCom>
+          <vUnCom>780.0000000000</vUnCom>
+          <vProd>3120.00</vProd>
+          <uTrib>LT</uTrib>
+          <qTrib>4.0000</qTrib>
+          <vUnTrib>780.0000000000</vUnTrib>
+        </prod>
+        <imposto>
+          <ICMS>
+            <ICMS50>
+              <orig>0</orig>
+              <CST>50</CST>
+              <modBC>0</modBC>
+              <vBC>0.00</vBC>
+              <pICMS>0.00</pICMS>
+              <vICMS>0.00</vICMS>
+            </ICMS50>
+          </ICMS>
+        </imposto>
+      </det>
+      <det nItem="3">
+        <prod>
+          <cProd>000457</cProd>
+          <xProd>VERNIZ ASA 952 LARANJA</xProd>
+          <NCM>85118090</NCM>
+          <CFOP>1401</CFOP>
+          <uCom>LT</uCom>
+          <qCom>4.0000</qCom>
+          <vUnCom>780.0000000000</vUnCom>
+          <vProd>3120.00</vProd>
+          <uTrib>LT</uTrib>
+          <qTrib>4.0000</qTrib>
+          <vUnTrib>780.0000000000</vUnTrib>
+        </prod>
+        <imposto>
+          <ICMS>
+            <ICMS50>
+              <orig>0</orig>
+              <CST>50</CST>
+              <modBC>0</modBC>
+              <vBC>0.00</vBC>
+              <pICMS>0.00</pICMS>
+              <vICMS>0.00</vICMS>
+            </ICMS50>
+          </ICMS>
+        </imposto>
+      </det>
+      <total>
+        <ICMSTot>
+          <vBC>0.00</vBC>
+          <vICMS>0.00</vICMS>
+          <vProd>9320.00</vProd>
+          <vNF>9320.00</vNF>
+        </ICMSTot>
+      </total>
+      <transp>
+        <modFrete>9</modFrete>
+      </transp>
+      <cobr>
+        <fat>
+          <nFat>123456</nFat>
+          <vOrig>9320.00</vOrig>
+          <vDesc>0.00</vDesc>
+          <vLiq>9320.00</vLiq>
+        </fat>
+        <dup>
+          <nDup>001</nDup>
+          <dVenc>2025-07-23</dVenc>
+          <vDup>2330.00</vDup>
+        </dup>
+        <dup>
+          <nDup>002</nDup>
+          <dVenc>2025-07-30</dVenc>
+          <vDup>2330.00</vDup>
+        </dup>
+        <dup>
+          <nDup>003</nDup>
+          <dVenc>2025-08-06</dVenc>
+          <vDup>2330.00</vDup>
+        </dup>
+        <dup>
+          <nDup>004</nDup>
+          <dVenc>2025-08-13</dVenc>
+          <vDup>2330.00</vDup>
+        </dup>
+      </cobr>
+      <infAdic>
+        <infAdFisco>Empresa optante pelo Simples Nacional. Este documento não transfere Crédito de IPI conforme LC 123/2006. Documento emitido por ME ou EPP optante pelo simples nacional não gera direito a crédito fiscal de ICMS.</infAdFisco>
+        <infCpl>Email do Destinatário: claudio@mcmbobinas.com.br</infCpl>
+      </infAdic>
+    </infNFe>
+  </NFe>
+</nfeProc>
+
+
