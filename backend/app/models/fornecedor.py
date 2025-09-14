@@ -3,7 +3,7 @@ from sqlalchemy import String, Integer, Boolean, DateTime
 from app.models.base import Base
 
 class Fornecedor(Base):
-    __tablename__ = "fornecedores"
+    __tablename__ = "fornecedor"
 
     id_fornecedor: Mapped[int] = mapped_column(primary_key=True, index=True)
     cnpj: Mapped[str] = mapped_column(String(18), unique=True, index=True, nullable=False)
