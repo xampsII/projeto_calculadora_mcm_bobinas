@@ -5,10 +5,10 @@ from app.config import settings
 
 # Create database engine using Transaction Pooler (IPv4)
 engine = create_engine(
-    settings.database_url,          # já aponta p/ Supabase pooler 6543 + sslmode=require
+    settings.database_url,          # já aponta p/ Postgrees + sslmode=require
     pool_pre_ping=True,
     connect_args={
-        "sslmode": "require",
+        "sslmode": "disable",
         "prepare_threshold": None,  # Desativa prepared statements automáticos para PgBouncer
     },
 )
