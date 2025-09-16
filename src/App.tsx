@@ -9,7 +9,7 @@ import CrudProdutos from './components/CrudProdutos';
 import { AppProvider } from './context/AppContext';
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'notas' | 'cadastro' | 'historico' | 'materias' | 'fornecedores' | 'produtos'>('notas');
+  const [activeTab, setActiveTab] = useState<'produtos' | 'cadastro' | 'historico' | 'materias' | 'fornecedores' | 'notas'>('produtos');
   const [notaEditandoId, setNotaEditandoId] = useState<string | undefined>();
 
   const handleNovaNotaClick = () => {

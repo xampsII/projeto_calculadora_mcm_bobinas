@@ -39,6 +39,19 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
       <nav className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-8 overflow-x-auto">
+                <button
+              onClick={() => onTabChange('produtos')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+                activeTab === 'produtos'
+                  ? 'border-red-600 text-red-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <ShoppingCart className="h-4 w-4" />
+                <span>Produtos</span>
+              </div>
+            </button>
             <button
               onClick={() => onTabChange('notas')}
               className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
@@ -89,19 +102,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
               <div className="flex items-center space-x-2">
                 <Users className="h-4 w-4" />
                 <span>Fornecedores</span>
-              </div>
-            </button>
-            <button
-              onClick={() => onTabChange('produtos')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
-                activeTab === 'produtos'
-                  ? 'border-red-600 text-red-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <ShoppingCart className="h-4 w-4" />
-                <span>Produtos</span>
               </div>
             </button>
           </div>
