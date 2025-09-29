@@ -153,6 +153,161 @@ async def list_notas(
     )
 
 
+@router.post("/{nota_id}/processar-precos")
+async def processar_precos_nota(
+    nota_id: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Processa uma nota fiscal e atualiza os preços das matérias-primas"""
+    if not current_user and not get_settings().DEBUG:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    
+    # Buscar a nota
+    nota = db.query(Nota).filter(Nota.id == nota_id).first()
+    if not nota:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Nota fiscal não encontrada"
+        )
+    
+    # Buscar todos os itens da nota
+    itens = db.query(NotaItem).filter(NotaItem.nota_id == nota_id).all()
+    
+    if not itens:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nota fiscal não possui itens para processar"
+        )
+    
+    precos_atualizados = []
+    
+    try:
+        for item in itens:
+            # Buscar a matéria-prima
+            materia_prima = db.query(MateriaPrima).filter(
+                MateriaPrima.id == item.materia_prima_id
+            ).first()
+            
+            if not materia_prima:
+                continue
+            
+            # Verificar se já existe um preço atual
+            preco_atual = db.query(MateriaPrimaPreco).filter(
+                and_(
+                    MateriaPrimaPreco.materia_prima_id == materia_prima.id,
+                    MateriaPrimaPreco.vigente_ate.is_(None)
+                )
+            ).first()
+            
+            # Se existe preço atual, fechar ele
+            if preco_atual:
+                preco_atual.vigente_ate = nota.emissao_date
+                db.add(preco_atual)
+            
+            # Criar novo preço
+            novo_preco = MateriaPrimaPreco(
+                materia_prima_id=materia_prima.id,
+                valor_unitario=item.valor_unitario,
+                vigente_desde=nota.emissao_date,
+                fornecedor_id=nota.fornecedor_id,
+                nota_id=nota.id,
+                origem="nota_fiscal"
+            )
+            
+            db.add(novo_preco)
+            precos_atualizados.append({
+                "materia_prima": materia_prima.nome,
+                "preco_anterior": float(preco_atual.valor_unitario) if preco_atual else None,
+                "preco_novo": float(item.valor_unitario),
+                "variacao": float(item.valor_unitario) - float(preco_atual.valor_unitario) if preco_atual else None
+            })
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": f"Preços atualizados para {len(precos_atualizados)} matérias-primas",
+            "nota_id": nota_id,
+            "precos_atualizados": precos_atualizados
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao processar preços: {str(e)}"
+        )
+
+
+@router.get("/materia-prima/{materia_prima_id}/historico-precos")
+async def get_historico_precos_materia_prima(
+    materia_prima_id: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Retorna o histórico completo de preços de uma matéria-prima"""
+    if not current_user and not get_settings().DEBUG:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    
+    # Verificar se a matéria-prima existe
+    materia_prima = db.query(MateriaPrima).filter(
+        and_(
+            MateriaPrima.id == materia_prima_id,
+            MateriaPrima.is_active == True
+        )
+    ).first()
+    
+    if not materia_prima:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Matéria-prima não encontrada"
+        )
+    
+    # Buscar histórico de preços
+    precos = db.query(MateriaPrimaPreco).filter(
+        MateriaPrimaPreco.materia_prima_id == materia_prima_id
+    ).order_by(MateriaPrimaPreco.vigente_desde.desc()).all()
+    
+    historico = []
+    for preco in precos:
+        # Buscar informações do fornecedor
+        fornecedor = db.query(Fornecedor).filter(
+            Fornecedor.id == preco.fornecedor_id
+        ).first() if preco.fornecedor_id else None
+        
+        # Buscar informações da nota
+        nota = db.query(Nota).filter(Nota.id == preco.nota_id).first() if preco.nota_id else None
+        
+        historico.append({
+            "id": preco.id,
+            "valor_unitario": float(preco.valor_unitario),
+            "vigente_desde": preco.vigente_desde.isoformat() if preco.vigente_desde else None,
+            "vigente_ate": preco.vigente_ate.isoformat() if preco.vigente_ate else None,
+            "origem": preco.origem.value if preco.origem else None,
+            "fornecedor": {
+                "id": fornecedor.id,
+                "nome": fornecedor.nome
+            } if fornecedor else None,
+            "nota": {
+                "id": nota.id,
+                "numero": nota.numero,
+                "serie": nota.serie
+            } if nota else None,
+            "created_at": preco.created_at.isoformat() if preco.created_at else None
+        })
+    
+    return {
+        "materia_prima": {
+            "id": materia_prima.id,
+            "nome": materia_prima.nome,
+            "unidade": materia_prima.unidade_codigo
+        },
+        "historico": historico,
+        "total_precos": len(historico)
+    }
+
+
 @router.get("/{nota_id}", response_model=NotaResponse)
 async def get_nota(
     nota_id: int,
@@ -231,8 +386,8 @@ async def create_nota(
     # Verificar se o fornecedor existe
     fornecedor = db.query(Fornecedor).filter(
         and_(
-            Fornecedor.id == nota_data.fornecedor_id,
-            Fornecedor.is_active == True
+            Fornecedor.id_fornecedor == nota_data.fornecedor_id,
+            Fornecedor.ativo == True
         )
     ).first()
     

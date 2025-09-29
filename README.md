@@ -189,7 +189,7 @@ project/
 
 ### Ambiente
 - `passlib[bcrypt]==1.7.4` e `bcrypt==3.2.2` (instale com `pip install -r requirements.txt`)
-- `.env` deve conter `DATABASE_URL` (pooler do Supabase, `sslmode=require`)
+- `.env` deve conter `DATABASE_URL` (PostgreSQL local, `sslmode=disable`)
 
 ### Validação de e-mail (Pydantic v2)
 Instale as dependências e verifique:
@@ -199,16 +199,61 @@ pip install -r requirements.txt
 python scripts/check_email_validator.py
 ```
 
-### Variáveis de Ambiente Importantes
+### Migração do Supabase para PostgreSQL Local
 
-1. **Copie o arquivo .env.example para .env e ajuste o host/senha:**
+#### Opção 1: Configuração Nova (Recomendado)
+
+1. **Instale PostgreSQL localmente:**
+   - Windows: https://www.postgresql.org/download/windows/
+   - macOS: `brew install postgresql`
+   - Ubuntu: `sudo apt install postgresql postgresql-contrib`
+
+2. **Configure o PostgreSQL:**
    ```bash
-   cp .env.example .env
+   # Inicie o serviço PostgreSQL
+   # Windows: Serviços > PostgreSQL
+   # macOS: brew services start postgresql
+   # Ubuntu: sudo systemctl start postgresql
    ```
 
-2. **Teste a conexão:**
+3. **Execute o script de configuração:**
    ```bash
-   python scripts/db_smoketest.py
+   python scripts/setup_postgresql.py
+   ```
+
+4. **Configure as variáveis de ambiente:**
+   ```bash
+   cp env.local.example .env
+   # Edite o arquivo .env com suas configurações
+   ```
+
+#### Opção 2: Migração de Dados do Supabase
+
+1. **Migre os dados existentes:**
+   ```bash
+   # Dry run (apenas verificar)
+   python scripts/migrate_from_supabase.py --dry-run
+   
+   # Migração real
+   python scripts/migrate_from_supabase.py
+   ```
+
+2. **Configure as variáveis de ambiente:**
+   ```bash
+   cp env.local.example .env
+   # Edite o arquivo .env com suas configurações
+   ```
+
+### Configuração Manual (Alternativa)
+
+1. **Copie o arquivo .env.example para .env e ajuste:**
+   ```bash
+   cp env.local.example .env
+   ```
+
+2. **Crie o banco de dados:**
+   ```sql
+   CREATE DATABASE nfe_system;
    ```
 
 3. **Rode migrações:**
@@ -233,8 +278,13 @@ python -c "from app.seeds import executar_seeds; executar_seeds()"
 ### Configurações Importantes
 
 ```env
-# Banco de dados (Transaction Pooler - Supabase)
-DATABASE_URL=postgresql+psycopg://postgres:<SENHA>@<HOST>:6543/postgres?sslmode=require
+# Banco de dados PostgreSQL Local
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=nfe_system
+DB_USER=postgres
+DB_PASSWORD=postgres
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/nfe_system?sslmode=disable
 
 # Redis
 REDIS_URL=redis://localhost:6379/0
@@ -243,7 +293,7 @@ REDIS_URL=redis://localhost:6379/0
 JWT_SECRET_KEY=sua_chave_secreta
 
 # Upload
-UPLOAD_DIR=./data/uploads
+UPLOAD_DIR=./uploads
 MAX_FILE_SIZE=10485760
 ```
 

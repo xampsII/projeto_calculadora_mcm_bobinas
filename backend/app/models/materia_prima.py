@@ -37,8 +37,9 @@ class MateriaPrimaPreco(Base):
     #     nullable=False,
     #     server_default=OrigemPreco.manual.value
     # )
-    fornecedor_id: Mapped[int | None] = mapped_column(ForeignKey("fornecedores.id"), nullable=True)
+    fornecedor_id: Mapped[int | None] = mapped_column(ForeignKey("fornecedor.id_fornecedor"), nullable=True)
     nota_id: Mapped[int | None] = mapped_column(ForeignKey("notas.id"), nullable=True)
+    observacao: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default="now()")
     
     # Relationships

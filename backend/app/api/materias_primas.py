@@ -22,6 +22,46 @@ from app.utils.audit import log_audit
 router = APIRouter(prefix="/materias-primas", tags=["materias-primas"])
 
 
+@router.get("/public", response_model=List[MateriaPrimaResponse])
+async def list_materias_primas_public(
+    db: Session = Depends(get_db)
+):
+    """Lista todas as matérias-primas ativas (endpoint público para frontend)"""
+    materias_primas = db.query(MateriaPrima).filter(MateriaPrima.is_active == True).all()
+    
+    items = []
+    for mp in materias_primas:
+        # Buscar preço atual usando a view
+        from sqlalchemy import text
+        preco_query = text("""
+            SELECT valor_unitario 
+            FROM vw_precos_atuais 
+            WHERE materia_prima_id = :materia_id
+            ORDER BY vigente_desde DESC 
+            LIMIT 1
+        """)
+        
+        result = db.execute(preco_query, {"materia_id": mp.id}).fetchone()
+        preco_atual = float(result[0]) if result else None
+        
+        items.append(MateriaPrimaResponse(
+            id=mp.id,
+            nome=mp.nome,
+            unidade_codigo=mp.unidade_codigo,
+            menor_unidade_codigo=mp.menor_unidade_codigo,
+            is_active=mp.is_active,
+            created_at=mp.created_at,
+            updated_at=mp.updated_at,
+            preco_atual=preco_atual,
+            preco_anterior=None,
+            variacao_abs=None,
+            variacao_pct=None,
+            vigente_desde=None
+        ))
+    
+    return items
+
+
 @router.get("/", response_model=PaginatedResponse[MateriaPrimaResponse])
 async def list_materias_primas(
     nome: Optional[str] = Query(None, description="Filtrar por nome"),

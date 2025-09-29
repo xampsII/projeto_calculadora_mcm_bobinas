@@ -4,14 +4,16 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from sqlalchemy import text
 import logging
 import time
 from contextlib import asynccontextmanager
 
 from app.config import get_settings
 from app.database import engine
-from app.models import Base, load_all_models
-from app.api import integracoes_router, usuarios_router, fornecedores_router, produtos_router
+from app.models import load_all_models
+from app.api import integracoes_router, usuarios_router, fornecedores_router, produtos_router, produtos_finais_router
+from app.api.uploads import router as uploads_router
 from app.api.notas import router as notas_router
 
 # Configuração de logging
@@ -35,6 +37,7 @@ async def lifespan(app: FastAPI):
     
     # Criar tabelas se não existirem (código síncrono)
     try:
+        from app.models.base import Base
         Base.metadata.create_all(bind=engine)
         logger.info("Banco de dados inicializado com sucesso")
     except Exception as e:
@@ -66,10 +69,13 @@ app = FastAPI(
 cors_origins = [
     "http://localhost:5173",
     "http://localhost:5174",
+    "http://localhost:5175",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5174",
+    "http://127.0.0.1:5175",
     "http://127.0.1.5173",
-    "http://127.0.1.5174"
+    "http://127.0.1.5174",
+    "http://127.0.1.5175"
 ]
 
 app.add_middleware(
@@ -187,7 +193,7 @@ async def health_check():
     try:
         from app.database import engine
         with engine.connect() as conn:
-            conn.execute("SELECT 1")
+            conn.execute(text("SELECT 1"))
         db_status = True
     except Exception as e:
         logger.error(f"Database health check failed: {e}")
@@ -228,6 +234,8 @@ app.include_router(integracoes_router)
 app.include_router(usuarios_router)
 app.include_router(fornecedores_router)
 app.include_router(produtos_router)
+app.include_router(produtos_finais_router)
+app.include_router(uploads_router)
 
 
 if __name__ == "__main__":

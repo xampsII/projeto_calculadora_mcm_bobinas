@@ -15,7 +15,7 @@ class Produto(Base):
     preco_venda: Mapped[float] = mapped_column(Float, nullable=True)
     estoque_minimo: Mapped[float] = mapped_column(Float, nullable=True)
     estoque_atual: Mapped[float] = mapped_column(Float, nullable=True)
-    fornecedor_id: Mapped[int | None] = mapped_column(ForeignKey("fornecedores.id"), nullable=True)
+    fornecedor_id: Mapped[int | None] = mapped_column(ForeignKey("fornecedor.id_fornecedor"), nullable=True)
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default="now()")
     updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), onupdate=None)
@@ -44,6 +44,7 @@ class ProdutoPreco(Base):
     custo_total: Mapped[float] = mapped_column(Float, nullable=False)
     vigente_desde: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False)
     vigente_ate: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    observacao: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default="now()")
 
     produto: Mapped["Produto"] = relationship("Produto", back_populates="precos") 

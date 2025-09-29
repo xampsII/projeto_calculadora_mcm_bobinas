@@ -82,4 +82,26 @@ def require_editor(current_user: User = Depends(get_current_active_user)) -> Use
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Acesso restrito a editores e administradores"
         )
-    return current_user 
+    return current_user
+
+
+def get_current_user_optional(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+) -> User | None:
+    """Obtém usuário atual a partir do token JWT, retorna None se não autenticado"""
+    try:
+        token = credentials.credentials
+        payload = verify_token(token)
+        
+        if not payload or payload.get("type") != "access":
+            return None
+        
+        user_id = payload.get("sub")
+        if user_id is None:
+            return None
+        
+        user = db.query(User).filter(User.id == user_id).first()
+        return user
+    except:
+        return None 

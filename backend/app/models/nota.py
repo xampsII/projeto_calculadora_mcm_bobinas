@@ -13,7 +13,7 @@ class Nota(Base):
     numero: Mapped[str] = mapped_column(String(50), nullable=False)
     serie: Mapped[str] = mapped_column(nullable=True)
     chave_acesso: Mapped[Optional[str]] = mapped_column(String(44), unique=True, nullable=True)
-    fornecedor_id: Mapped[int | None] = mapped_column(ForeignKey("fornecedores.id"), nullable=True)
+    fornecedor_id: Mapped[int | None] = mapped_column(ForeignKey("fornecedor.id_fornecedor"), nullable=True)
     emissao_date: Mapped[Date] = mapped_column(Date, nullable=False)
     valor_total: Mapped[float] = mapped_column(Float, nullable=False)
     arquivo_xml_path: Mapped[Optional[str]] = mapped_column(String, nullable=True)

@@ -9,10 +9,10 @@ class Unidade(Base):
     codigo: Mapped[str] = mapped_column(String(10), unique=True, index=True, nullable=False)
     descricao: Mapped[str] = mapped_column(nullable=False)
     fator_para_menor: Mapped[float | None] = mapped_column(Numeric(10, 4), nullable=True)
-    menor_unidade_codigo: Mapped[str | None] = mapped_column(String(10), ForeignKey("unidades.codigo"), nullable=True)
+    menor_unidade_id: Mapped[int | None] = mapped_column(ForeignKey("unidades.id"), nullable=True)
     is_base: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    menor_unidade: Mapped["Unidade"] = relationship("Unidade", remote_side=[codigo], foreign_keys=[menor_unidade_codigo])
+    menor_unidade: Mapped["Unidade"] = relationship("Unidade", remote_side=[id], foreign_keys=[menor_unidade_id])
     materias_primas: Mapped[list["MateriaPrima"]] = relationship("MateriaPrima", foreign_keys="MateriaPrima.unidade_codigo", back_populates="unidade")
     materia_prima_menor: Mapped[list["MateriaPrima"]] = relationship("MateriaPrima", foreign_keys="MateriaPrima.menor_unidade_codigo", back_populates="menor_unidade")
     nota_itens: Mapped[list["NotaItem"]] = relationship("NotaItem", back_populates="unidade")

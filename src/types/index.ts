@@ -33,6 +33,7 @@ export interface ProdutoFinal {
   idUnico: string;
   componentes: ProdutoComponente[];
   ativo: boolean;
+  custo_total?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -151,9 +152,13 @@ export interface AppContextType {
   adicionarProdutoFinal: (produto: Omit<ProdutoFinal, 'id' | 'createdAt' | 'updatedAt'>) => Promise<{ success: boolean; message: string }>;
   atualizarProdutoFinal: (id: string, produto: Partial<ProdutoFinal>) => Promise<{ success: boolean; message: string }>;
   excluirProdutoFinal: (id: string) => Promise<{ success: boolean; message: string }>;
+  carregarProdutosFinais: () => Promise<void>;
   
   // Histórico
   obterHistoricoPorMateria: (nome: string) => HistoricoPreco[];
   obterHistoricoPorProduto: (nome: string) => HistoricoProduto[];
   limparHistoricoAntigo: () => void;
+  
+  // API Base URL
+  API_BASE_URL: string;
 }

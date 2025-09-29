@@ -2,6 +2,7 @@ from .base import Base
 from .user import User
 from .fornecedor import Fornecedor
 from .produto import Produto
+from .produto_final import ProdutoFinal
 from .unidade import Unidade
 from .materia_prima import MateriaPrima
 from .nota import Nota
@@ -14,6 +15,7 @@ def load_all_models() -> None:
     import app.models.materia_prima
     import app.models.nota
     import app.models.produto
+    import app.models.produto_final
     import app.models.audit
 
 __all__ = [
@@ -22,6 +24,7 @@ __all__ = [
     "User",
     "Fornecedor",
     "Produto",
+    "ProdutoFinal",
     "Unidade",
     "MateriaPrima",
     "Nota",

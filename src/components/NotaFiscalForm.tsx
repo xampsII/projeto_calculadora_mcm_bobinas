@@ -53,7 +53,7 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
   const [importLoading, setImportLoading] = useState(false);
   const [apiLoading, setApiLoading] = useState(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [previewData, setPreviewData] = useState<any[]>([]);
+  const [dadosExtraidos, setDadosExtraidos] = useState<any>(null);
   const [apiKey, setApiKey] = useState('');
   const [customUnidades, setCustomUnidades] = useState<{[key: number]: string}>({});
 
@@ -263,10 +263,10 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const validTypes = ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/xml', 'application/xml'];
-    if (!validTypes.includes(file.type) && !file.name.toLowerCase().match(/\.(csv|xlsx|xls|xml)$/)) {
+    const validTypes = ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/xml', 'application/xml', 'application/pdf'];
+    if (!validTypes.includes(file.type) && !file.name.toLowerCase().match(/\.(csv|xlsx|xls|xml|pdf)$/)) {
       setNotification({
-        message: 'Tipo de arquivo inválido. Use CSV, XLSX, XLS ou XML.',
+        message: 'Tipo de arquivo inválido. Use CSV, XLSX, XLS, XML ou PDF.',
         type: 'error',
       });
       return;
@@ -353,31 +353,6 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
       });
     } finally {
       setApiLoading(false);
-    }
-  };
-
-  const importPreviewToForm = () => {
-    if (previewData.length > 0) {
-      const newItens = previewData.map((item, index) => ({
-        id: `preview-${index}`,
-        materiaPrimaNome: item.materiaPrimaNome || '',
-        unidadeMedida: item.unidadeMedida || '',
-        quantidade: Number(item.quantidade) || 0,
-        valorUnitario: Number(item.valorUnitario) || 0,
-        valorTotal: Number(item.quantidade) * Number(item.valorUnitario) || 0,
-      }));
-      
-      setFormData(prev => ({
-        ...prev,
-        itens: newItens,
-      }));
-      
-      setPreviewData([]);
-      setActiveMode('manual');
-      setNotification({
-        message: 'Dados importados com sucesso!',
-        type: 'success',
-      });
     }
   };
 
@@ -502,62 +477,19 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
                       name="file-upload"
                       type="file"
                       className="sr-only"
-                      accept=".csv,.xlsx,.xls,.xml"
+                      accept=".csv,.xlsx,.xls,.xml,.pdf"
                       onChange={handleFileUpload}
                       disabled={importLoading}
                     />
                   </div>
                   <p className="text-xs text-gray-400">
-                    Arquivos suportados: CSV, XLSX, XLS, XML (máx. 10MB)
+                    Arquivos suportados: CSV, XLSX, XLS, XML, PDF (máx. 10MB)
                   </p>
                 </div>
               )}
             </div>
           </div>
           
-          {/* Preview dos dados importados */}
-          {previewData.length > 0 && (
-            <div className="mt-6">
-              <h4 className="text-lg font-medium text-gray-900 mb-4">Preview dos Dados</h4>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Matéria-prima</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Unidade</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Quantidade</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Valor Unit.</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Valor Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {previewData.slice(0, 5).map((item, index) => (
-                      <tr key={index}>
-                        <td className="px-4 py-2 text-sm text-gray-700">{item.materiaPrimaNome}</td>
-                        <td className="px-4 py-2 text-sm text-gray-700">{item.unidadeMedida}</td>
-                        <td className="px-4 py-2 text-sm text-gray-700">{item.quantidade}</td>
-                        <td className="px-4 py-2 text-sm text-gray-700">{formatCurrency(item.valorUnitario)}</td>
-                        <td className="px-4 py-2 text-sm text-gray-700">{formatCurrency(item.quantidade * item.valorUnitario)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {previewData.length > 5 && (
-                <p className="text-sm text-gray-500 mt-2">
-                  ... e mais {previewData.length - 5} itens
-                </p>
-              )}
-              <div className="flex justify-end mt-4">
-                <button
-                  onClick={importPreviewToForm}
-                  className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-4 py-2 rounded-lg font-medium transition-all"
-                >
-                  Importar Dados
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       )}
 

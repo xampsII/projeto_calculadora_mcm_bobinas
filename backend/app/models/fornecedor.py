@@ -10,8 +10,8 @@ class Fornecedor(Base):
     nome: Mapped[str] = mapped_column(nullable=False)
     endereco: Mapped[str] = mapped_column(nullable=True)
     ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    criado_em: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default="now()")
-    atualizado_em: Mapped[DateTime] = mapped_column(DateTime(timezone=True), onupdate=None)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default="now()")
+    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default="now()", onupdate="now()")
 
     notas: Mapped[list["Nota"]] = relationship("Nota", back_populates="fornecedor")
     materia_prima_precos: Mapped[list["MateriaPrimaPreco"]] = relationship("MateriaPrimaPreco", back_populates="fornecedor") 

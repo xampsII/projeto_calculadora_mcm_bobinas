@@ -1,15 +1,15 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from app.models.base import Base  # Importa Base do módulo isolado
 from app.config import settings
 
-# Create database engine using Transaction Pooler (IPv4)
+# Create database engine for PostgreSQL
 engine = create_engine(
-    settings.database_url,          # já aponta p/ Postgrees + sslmode=require
+    settings.database_url,
     pool_pre_ping=True,
+    pool_size=10,
+    max_overflow=20,
     connect_args={
         "sslmode": "disable",
-        "prepare_threshold": None,  # Desativa prepared statements automáticos para PgBouncer
     },
 )
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)

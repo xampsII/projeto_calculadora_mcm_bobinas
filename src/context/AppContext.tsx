@@ -207,6 +207,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data: { success: boolean; message: string } = await response.json();
+      
+      // Recarregar a lista de produtos após adicionar
+      if (data.success) {
+        await carregarProdutosFinais();
+      }
+      
       return data;
     } catch (error) {
       console.error("Erro ao adicionar produto final:", error);
@@ -216,6 +222,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
   const atualizarProdutoFinal = async (id: string, produto: Partial<ProdutoFinal>): Promise<{ success: boolean; message: string }> => {
     try {
+      console.log('=== ATUALIZANDO PRODUTO ===');
+      console.log('ID:', id);
+      console.log('Produto:', produto);
+      console.log('URL:', `${API_BASE_URL}/produtos-finais/${id}`);
+      
       const response = await fetch(`${API_BASE_URL}/produtos-finais/${id}`, {
         method: 'PUT',
         headers: {
@@ -223,14 +234,25 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         },
         body: JSON.stringify(produto),
       });
+      
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+      
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error('Erro response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
+      
       const data: { success: boolean; message: string } = await response.json();
+      console.log('Data recebida:', data);
       return data;
     } catch (error) {
       console.error("Erro ao atualizar produto final:", error);
-      return { success: false, message: 'Erro ao atualizar produto.' };
+      return { 
+        success: false, 
+        message: `Erro ao atualizar produto: ${error instanceof Error ? error.message : 'Erro desconhecido'}` 
+      };
     }
   };
 
@@ -247,6 +269,19 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     } catch (error) {
       console.error("Erro ao excluir produto final:", error);
       return { success: false, message: 'Erro ao excluir produto.' };
+    }
+  };
+
+  const carregarProdutosFinais = async (): Promise<void> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/produtos-finais/`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const produtos: ProdutoFinal[] = await response.json();
+      setProdutosFinais(produtos);
+    } catch (error) {
+      console.error("Erro ao carregar produtos finais:", error);
     }
   };
 
@@ -395,10 +430,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const importarNotasFiscais = async (arquivo: File): Promise<{ success: boolean; message: string; dados?: any; preview?: any[] }> => {
     try {
       const formData = new FormData();
-      formData.append('files', arquivo);
+      formData.append('file', arquivo);
       formData.append('commit', 'true');
 
-      const response = await fetch(`${API_BASE_URL}/notas/import`, {
+      const response = await fetch(`${API_BASE_URL}/uploads/processar-arquivo`, {
         method: 'POST',
         body: formData,
       });
@@ -406,7 +441,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      const data: { success: boolean; message: string; resultados?: any[] } = await response.json();
+      const data: { success: boolean; message: string; resultados?: any[]; dados_extraidos?: any } = await response.json();
+
+      console.log('Resposta do backend:', data); // Debug
 
       if (data.success && data.resultados && data.resultados.length > 0) {
         const resultado = data.resultados[0];
@@ -414,6 +451,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           success: true, 
           message: resultado.mensagem, 
           dados: resultado.dados 
+        };
+      } else if (data.success && data.dados_extraidos) {
+        // Para PDFs e XMLs - dados extraídos diretamente
+        return {
+          success: true,
+          message: data.message,
+          dados_extraidos: data.dados_extraidos,
         };
       } else {
         return { success: false, message: data.message };
@@ -484,11 +528,15 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     adicionarProdutoFinal,
     atualizarProdutoFinal,
     excluirProdutoFinal,
+    carregarProdutosFinais,
     
     // Histórico
     obterHistoricoPorMateria,
     obterHistoricoPorProduto,
     limparHistoricoAntigo,
+    
+    // API Base URL
+    API_BASE_URL,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
