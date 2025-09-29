@@ -26,7 +26,7 @@ def processar_xml_nfe(content: bytes) -> dict:
         }
         return dados
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Erro ao processar XML: {str(e)}")
+       raise HTTPException(status_code=400, detail=f"Erro ao processar XML: {str(e)}")
 
 def extrair_dados_nfe_regex(texto: str) -> dict:
     """Extrai dados da NFe usando regex melhoradas"""
@@ -83,11 +83,11 @@ def extrair_dados_nfe_regex(texto: str) -> dict:
                 break
             except:
                 continue
-    
+            
     return dados
 
 def extrair_itens_produtos(texto: str) -> List[Dict]:
-    """Extrai itens de produtos do texto da NFe"""
+    """Extrai itens de produtos do texto da NFe DANFE"""
     
     def norm(s: str) -> str:
         if s is None:
@@ -99,79 +99,56 @@ def extrair_itens_produtos(texto: str) -> List[Dict]:
     def to_float_brl(s: str) -> float:
         if not s: return 0.0
         s = re.sub(r"[^0-9\.,\-]", "", s)
-        if s.count(",")==1 and s.count(".")>=1: 
-            s = s.replace(".","").replace(",",".")
-        elif s.count(",")==1: 
-            s = s.replace(",",".")
-        try: 
+        # Formato brasileiro: 1.234,56
+        if s.count(",") == 1 and s.count(".") >= 1:
+            s = s.replace(".", "").replace(",", ".")
+        elif s.count(",") == 1:
+            s = s.replace(",", ".")
+        try:
             return float(s)
-        except: 
+        except:
             return 0.0
     
-    # Buscar linhas que parecem ser itens
     lines = [norm(l) for l in (texto or "").splitlines()]
     items = []
     
+    # Buscar região da tabela de produtos
+    start_idx = -1
     for i, line in enumerate(lines):
-        # Buscar linhas que começam com números (código do produto)
-        if re.match(r'^\d{3,}', line):
-            parts = line.split()
-            if len(parts) >= 8:  # Mínimo de campos esperados
-                try:
-                    # Buscar NCM (8 dígitos)
-                    ncm = None
-                    for part in parts:
-                        if re.match(r'^\d{8}$', part):
-                            ncm = part
-                            break
-                    
-                    if ncm:
-                        # Buscar CFOP (4 dígitos)
-                        cfop = None
-                        for part in parts:
-                            if re.match(r'^\d{4}$', part) and part != ncm[:4]:
-                                cfop = part
-                                break
-                        
-                        # Buscar unidade (KG, UN, etc.)
-                        unidade = None
-                        for part in parts:
-                            if re.match(r'^[A-Z]{1,4}$', part):
-                                unidade = part
-                                break
-                        
-                        # Buscar números (quantidade, valores)
-                        numeros = []
-                        for part in parts:
-                            if re.match(r'^[\d.,]+$', part):
-                                numeros.append(to_float_brl(part))
-                        
-                        # Filtrar números que são muito grandes (provavelmente códigos)
-                        valores_validos = []
-                        for num in numeros:
-                            if num > 0 and num < 1000000:  # Valores razoáveis
-                                valores_validos.append(num)
-                        
-                        if len(valores_validos) >= 3:  # qtd, valor_unit, valor_total
-                            # Extrair descrição (texto entre código e NCM)
-                            codigo_idx = 0
-                            ncm_idx = parts.index(ncm)
-                            descricao = " ".join(parts[codigo_idx+1:ncm_idx])
-                            
-                            item = {
-                                "codigo": parts[0],
-                                "descricao": descricao,
-                                "ncm": ncm,
-                                "cfop": cfop or "0000",
-                                "un": unidade or "UN",
-                                "quantidade": valores_validos[0],
-                                "valor_unitario": valores_validos[1],
-                                "valor_total": valores_validos[2],
-                            }
-                            items.append(item)
-                            
-                except Exception as e:
-                    continue
+        if "DADOS DOS PRODUTOS" in line or "PRODUTOS/SERVIÇOS" in line:
+            start_idx = i
+            break
+    
+    if start_idx == -1:
+        return items
+    
+    # Buscar linhas com código de 6 dígitos seguido de descrição
+    for i in range(start_idx, min(start_idx + 50, len(lines))):
+        line = lines[i]
+        
+        # Padrão: 000600 -FIO 2.0X7.0 CANTO QUADRADO 85118090 0500 2401 KG 306,5000 73,0000 22.374,50
+        match = re.match(r'^(\d{6})\s+(.*?)\s+(\d{8})\s+(\d{4})\s+(\d{4})\s+(\w{1,3})\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,]+)', line)
+        if match:
+            codigo, descricao, ncm, o_cst, cfop, unidade, qtd_str, valor_unit_str, valor_total_str = match.groups()
+            
+            # Converter valores
+            quantidade = to_float_brl(qtd_str)
+            valor_unitario = to_float_brl(valor_unit_str)
+            valor_total = to_float_brl(valor_total_str)
+            
+            # Validar se os valores fazem sentido
+            if quantidade > 0 and valor_unitario > 0 and valor_total > 0:
+                item = {
+                    "codigo": codigo,
+                    "descricao": descricao.strip(),
+                    "ncm": ncm,
+                    "cfop": cfop,
+                    "un": unidade,
+                    "quantidade": quantidade,
+                    "valor_unitario": valor_unitario,
+                    "valor_total": valor_total,
+                }
+                items.append(item)
     
     return items
 
@@ -245,7 +222,7 @@ async def processar_arquivo_universal(file: UploadFile = File(...)):
             return {
                 "success": False,
                 "arquivo": file.filename,
-                "message": f"Erro ao processar PDF: {str(e)}"
+                "mensagem": f"Erro ao processar PDF: {str(e)}"
             }
     
     return {
@@ -293,4 +270,4 @@ async def teste_pdf(file: UploadFile = File(...)):
         return {
             "success": False,
             "erro": str(e)
-        } 
+    } 

@@ -102,14 +102,14 @@ async def list_notas(
     # Buscar fornecedor e itens para cada nota
     items = []
     for nota in notas:
-        fornecedor = db.query(Fornecedor).filter(Fornecedor.id == nota.fornecedor_id).first()
+        fornecedor = db.query(Fornecedor).filter(Fornecedor.id_fornecedor == nota.fornecedor_id).first()
         itens = db.query(NotaItem).filter(NotaItem.nota_id == nota.id).all()
         
         # Criar dicionário do fornecedor
         fornecedor_dict = None
         if fornecedor:
             fornecedor_dict = {
-                "id": fornecedor.id,
+                "id": fornecedor.id_fornecedor,
                 "nome": fornecedor.nome,
                 "cnpj": fornecedor.cnpj
             }
@@ -273,7 +273,7 @@ async def get_historico_precos_materia_prima(
     for preco in precos:
         # Buscar informações do fornecedor
         fornecedor = db.query(Fornecedor).filter(
-            Fornecedor.id == preco.fornecedor_id
+            Fornecedor.id_fornecedor == preco.fornecedor_id
         ).first() if preco.fornecedor_id else None
         
         # Buscar informações da nota
@@ -286,7 +286,7 @@ async def get_historico_precos_materia_prima(
             "vigente_ate": preco.vigente_ate.isoformat() if preco.vigente_ate else None,
             "origem": preco.origem.value if preco.origem else None,
             "fornecedor": {
-                "id": fornecedor.id,
+                "id": fornecedor.id_fornecedor,
                 "nome": fornecedor.nome
             } if fornecedor else None,
             "nota": {
@@ -323,14 +323,14 @@ async def get_nota(
             detail="Nota fiscal não encontrada"
         )
     
-    fornecedor = db.query(Fornecedor).filter(Fornecedor.id == nota.fornecedor_id).first()
+    fornecedor = db.query(Fornecedor).filter(Fornecedor.id_fornecedor == nota.fornecedor_id).first()
     itens = db.query(NotaItem).filter(NotaItem.nota_id == nota.id).all()
     
     # Criar dicionário do fornecedor
     fornecedor_dict = None
     if fornecedor:
         fornecedor_dict = {
-            "id": fornecedor.id,
+            "id": fornecedor.id_fornecedor,
             "nome": fornecedor.nome,
             "cnpj": fornecedor.cnpj
         }
@@ -520,7 +520,7 @@ async def create_nota(
     fornecedor_dict = None
     if fornecedor:
         fornecedor_dict = {
-            "id": fornecedor.id,
+            "id": fornecedor.id_fornecedor,
             "nome": fornecedor.nome,
             "cnpj": fornecedor.cnpj
         }
@@ -622,14 +622,14 @@ async def update_nota(
         )
     
     # Buscar dados atualizados para resposta
-    fornecedor = db.query(Fornecedor).filter(Fornecedor.id == nota.fornecedor_id).first()
+    fornecedor = db.query(Fornecedor).filter(Fornecedor.id_fornecedor == nota.fornecedor_id).first()
     itens = db.query(NotaItem).filter(NotaItem.nota_id == nota.id).all()
     
     # Criar dicionário do fornecedor
     fornecedor_dict = None
     if fornecedor:
         fornecedor_dict = {
-            "id": fornecedor.id,
+            "id": fornecedor.id_fornecedor,
             "nome": fornecedor.nome,
             "cnpj": fornecedor.cnpj
         }
@@ -780,7 +780,7 @@ async def import_notas(
                     status=StatusNota.processando,
                     emissao_date=datetime.now().date(),
                     valor_total=0.0,
-                    fornecedor_id=fornecedor_padrao.id
+                    fornecedor_id=fornecedor_padrao.id_fornecedor
                 )
                 
                 if file.filename.lower().endswith('.xml'):
@@ -847,7 +847,7 @@ async def import_notas(
                                 db.commit()
                                 db.refresh(fornecedor)
                             
-                            nota.fornecedor_id = fornecedor.id
+                            nota.fornecedor_id = fornecedor.id_fornecedor
                         
                         # Valor total
                         v_nf = root.find('.//nfe:vNF', namespaces)

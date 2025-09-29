@@ -1,12 +1,14 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 from app.database import get_db
 import xml.etree.ElementTree as ET
 from datetime import datetime
 import fitz  # PyMuPDF
 import re
 from typing import List, Dict
+from unidecode import unidecode
+import io
+import pdfplumber
 
 router = APIRouter(prefix="/uploads", tags=["uploads"])
 
@@ -14,116 +16,186 @@ def processar_xml_nfe(content: bytes) -> dict:
     """Processa arquivo XML de NFe"""
     try:
         root = ET.fromstring(content)
-        
         dados = {
             "numero_nota": "123456",
             "serie": "1",
-            "data_emissao": "01/01/2024",
             "valor_total": 100.0,
             "fornecedor": "Fornecedor Teste",
             "cnpj_fornecedor": "12345678000123",
             "itens": []
         }
-        
         return dados
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Erro ao processar XML: {str(e)}")
 
 def extrair_dados_nfe_regex(texto: str) -> dict:
-    """Extrai dados da NFe usando regex"""
+    """Extrai dados da NFe usando regex melhoradas"""
     dados = {}
     
-    # Número da nota
-    numero_match = re.search(r'N[ºo°]\s*(\d+)', texto, re.IGNORECASE)
-    if numero_match:
-        dados['numero_nota'] = numero_match.group(1)
+    # Número da nota - mais flexível
+    numero_patterns = [
+        r'N[ºo°\.:\s]*(\d{6,})',  # N° 123456
+        r'NÚMERO[:\s]*(\d{6,})',   # NÚMERO: 123456
+        r'(\d{6,})',               # Qualquer sequência de 6+ dígitos
+    ]
+    for pattern in numero_patterns:
+        numero_match = re.search(pattern, texto, re.IGNORECASE)
+        if numero_match:
+            dados['numero_nota'] = numero_match.group(1)
+            break
     
-    # Data de emissão
-    data_match = re.search(r'(\d{2}/\d{2}/\d{4})', texto)
-    if data_match:
-        dados['data_emissao'] = data_match.group(1)
+    # CNPJ - mais flexível
+    cnpj_patterns = [
+        r'(\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})',  # Com ou sem pontuação
+        r'CNPJ[:\s]*(\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})',
+    ]
+    for pattern in cnpj_patterns:
+        cnpj_match = re.search(pattern, texto)
+        if cnpj_match:
+            dados['cnpj_fornecedor'] = cnpj_match.group(1)
+            break
     
-    # Valor total
-    valor_match = re.search(r'VALOR\s+TOTAL\s+DA\s+NOTA\s+FISCAL[:\s]*R\$\s*([\d.,]+)', texto, re.IGNORECASE)
-    if valor_match:
-        valor_str = valor_match.group(1).replace('.', '').replace(',', '.')
-        dados['valor_total'] = float(valor_str)
+    # Fornecedor - buscar por qualquer nome em maiúsculas
+    fornecedor_patterns = [
+        r'([A-Z][A-Z\s\.&\-]{10,})',  # Nome em maiúsculas
+        r'RAZÃO\s+SOCIAL[:\s]*([^\n\r]+)',
+    ]
+    for pattern in fornecedor_patterns:
+        fornecedor_match = re.search(pattern, texto, re.IGNORECASE)
+        if fornecedor_match:
+            nome = fornecedor_match.group(1).strip()
+            if len(nome) > 10:  # Nome razoável
+                dados['fornecedor'] = nome
+                break
     
-    # Fornecedor
-    fornecedor_match = re.search(r'RAZÃO\s+SOCIAL[:\s]*([^\n\r]+)', texto, re.IGNORECASE)
-    if fornecedor_match:
-        dados['fornecedor'] = fornecedor_match.group(1).strip()
-    
-    # CNPJ
-    cnpj_match = re.search(r'CNPJ[:\s]*(\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2})', texto)
-    if cnpj_match:
-        dados['cnpj_fornecedor'] = cnpj_match.group(1)
+    # Valor total - mais flexível
+    valor_patterns = [
+        r'VALOR\s+TOTAL[:\s]*R?\$?\s*([\d.,]+)',
+        r'TOTAL[:\s]*R?\$?\s*([\d.,]+)',
+        r'R\$\s*([\d.,]+)',
+    ]
+    for pattern in valor_patterns:
+        valor_match = re.search(pattern, texto, re.IGNORECASE)
+        if valor_match:
+            valor_str = valor_match.group(1).replace('.', '').replace(',', '.')
+            try:
+                dados['valor_total'] = float(valor_str)
+                break
+            except:
+                continue
     
     return dados
 
 def extrair_itens_produtos(texto: str) -> List[Dict]:
     """Extrai itens de produtos do texto da NFe"""
-    itens = []
     
-    # Procurar por seção de produtos
-    produtos_section = re.search(r'DADOS\s+DOS\s+PRODUTOS/SERVIÇOS(.*?)(?=INFORMAÇÕES\s+COMPLEMENTARES|$)', texto, re.IGNORECASE | re.DOTALL)
+    def norm(s: str) -> str:
+        if s is None:
+            return ""
+        s = unidecode(str(s)).replace("\xa0", " ")
+        s = re.sub(r"\s+", " ", s).strip()
+        return s
     
-    if produtos_section:
-        produtos_texto = produtos_section.group(1)
-        
-        # Dividir em linhas e processar
-        linhas = produtos_texto.split('\n')
-        
-        for linha in linhas:
-            linha = linha.strip()
-            if not linha or len(linha) < 10:
-                continue
-            
-            # Procurar por padrão de item (código, descrição, quantidade, valor)
-            item_match = re.search(r'(\d+)\s+([A-Za-z\s]+?)\s+(\d+)\s+([\d.,]+)\s+([\d.,]+)', linha)
-            
-            if item_match:
-                codigo = item_match.group(1)
-                descricao = item_match.group(2).strip()
-                quantidade = item_match.group(3)
-                valor_unit = item_match.group(4).replace(',', '.')
-                valor_total = item_match.group(5).replace(',', '.')
-                
-                itens.append({
-                    "codigo": codigo,
-                    "descricao": descricao,
-                    "quantidade": float(quantidade),
-                    "valor_unitario": float(valor_unit),
-                    "valor_total": float(valor_total),
-                    "unidade": "UN"
-                })
+    def to_float_brl(s: str) -> float:
+        if not s: return 0.0
+        s = re.sub(r"[^0-9\.,\-]", "", s)
+        if s.count(",")==1 and s.count(".")>=1: 
+            s = s.replace(".","").replace(",",".")
+        elif s.count(",")==1: 
+            s = s.replace(",",".")
+        try: 
+            return float(s)
+        except: 
+            return 0.0
     
-    return itens
+    # Buscar linhas que parecem ser itens
+    lines = [norm(l) for l in (texto or "").splitlines()]
+    items = []
+    
+    for i, line in enumerate(lines):
+        # Buscar linhas que começam com números (código do produto)
+        if re.match(r'^\d{3,}', line):
+            parts = line.split()
+            if len(parts) >= 8:  # Mínimo de campos esperados
+                try:
+                    # Buscar NCM (8 dígitos)
+                    ncm = None
+                    for part in parts:
+                        if re.match(r'^\d{8}$', part):
+                            ncm = part
+                            break
+                    
+                    if ncm:
+                        # Buscar CFOP (4 dígitos)
+                        cfop = None
+                        for part in parts:
+                            if re.match(r'^\d{4}$', part) and part != ncm[:4]:
+                                cfop = part
+                                break
+                        
+                        # Buscar unidade (KG, UN, etc.)
+                        unidade = None
+                        for part in parts:
+                            if re.match(r'^[A-Z]{1,4}$', part):
+                                unidade = part
+                                break
+                        
+                        # Buscar números (quantidade, valores)
+                        numeros = []
+                        for part in parts:
+                            if re.match(r'^[\d.,]+$', part):
+                                numeros.append(to_float_brl(part))
+                        
+                        # Filtrar números que são muito grandes (provavelmente códigos)
+                        valores_validos = []
+                        for num in numeros:
+                            if num > 0 and num < 1000000:  # Valores razoáveis
+                                valores_validos.append(num)
+                        
+                        if len(valores_validos) >= 3:  # qtd, valor_unit, valor_total
+                            # Extrair descrição (texto entre código e NCM)
+                            codigo_idx = 0
+                            ncm_idx = parts.index(ncm)
+                            descricao = " ".join(parts[codigo_idx+1:ncm_idx])
+                            
+                            item = {
+                                "codigo": parts[0],
+                                "descricao": descricao,
+                                "ncm": ncm,
+                                "cfop": cfop or "0000",
+                                "un": unidade or "UN",
+                                "quantidade": valores_validos[0],
+                                "valor_unitario": valores_validos[1],
+                                "valor_total": valores_validos[2],
+                            }
+                            items.append(item)
+                            
+                except Exception as e:
+                    continue
+    
+    return items
 
 def processar_pdf_nfe(content: bytes) -> dict:
     """Processa arquivo PDF de NFe"""
     try:
-        doc = fitz.open(stream=content, filetype="pdf")
-        texto_completo = ""
+        file_like = io.BytesIO(content)
+        pages_text = []
         
-        for page_num in range(doc.page_count):
-            page = doc[page_num]
-            texto_completo += page.get_text()
+        with pdfplumber.open(file_like) as pdf:
+            for page in pdf.pages:
+                t = page.extract_text() or ""
+                pages_text.append(t)
         
-        doc.close()
+        # Combinar texto de todas as páginas
+        texto_completo = "\n".join(pages_text)
         
-        # Extrair dados básicos
         dados = extrair_dados_nfe_regex(texto_completo)
-        
-        # Extrair itens
         itens = extrair_itens_produtos(texto_completo)
         dados['itens'] = itens
         
-        # Valores padrão se não encontrados
+        # Valores padrão
         if 'numero_nota' not in dados:
             dados['numero_nota'] = "000000"
-        if 'data_emissao' not in dados:
-            dados['data_emissao'] = "01/01/2024"
         if 'valor_total' not in dados:
             dados['valor_total'] = 0.0
         if 'fornecedor' not in dados:
@@ -203,23 +275,22 @@ async def teste_pdf(file: UploadFile = File(...)):
     """Endpoint de teste para debug de PDF"""
     try:
         content = await file.read()
-        doc = fitz.open(stream=content, filetype="pdf")
-        texto_completo = ""
+        file_like = io.BytesIO(content)
         
-        for page_num in range(doc.page_count):
-            page = doc[page_num]
-            texto_completo += page.get_text()
-        
-        doc.close()
+        with pdfplumber.open(file_like) as pdf:
+            texto_completo = ""
+            for page in pdf.pages:
+                texto_completo += page.extract_text() or ""
         
         return {
             "success": True,
             "arquivo": file.filename,
             "total_caracteres": len(texto_completo),
-            "texto_extraido": texto_completo[:1000] + "..." if len(texto_completo) > 1000 else texto_completo
+            "texto_extraido": texto_completo[:2000] + "..." if len(texto_completo) > 2000 else texto_completo,
+            "debug_itens": extrair_itens_produtos(texto_completo)
         }
     except Exception as e:
         return {
             "success": False,
             "erro": str(e)
-        }
+        } 
