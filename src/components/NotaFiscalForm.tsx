@@ -151,7 +151,14 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
 
   const handleItemChange = (index: number, field: string, value: string | number) => {
     const newItems = [...formData.itens];
-    newItems[index] = { ...newItems[index], [field]: field === 'quantidade' || field === 'valorUnitario' ? Number(value) : value };
+    
+    // Formatar valor unitário para 2 casas decimais
+    if (field === 'valorUnitario') {
+      const numValue = Number(value);
+      newItems[index] = { ...newItems[index], [field]: Number(numValue.toFixed(2)) };
+    } else {
+      newItems[index] = { ...newItems[index], [field]: field === 'quantidade' ? Number(value) : value };
+    }
 
     // Calculate valorTotal for the item
     const qty = newItems[index].quantidade;
@@ -285,8 +292,8 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
             unidadeMedida: item.un || '',  // Mapear diretamente a unidade do PDF
             menorUnidadeUso: item.un || '',  // Mostrar a unidade na coluna Menor Unidade
             quantidade: item.quantidade || 0,
-            valorUnitario: item.valor_unitario || 0,
-            valorTotal: item.valor_total || 0,
+            valorUnitario: Number((item.valor_unitario || 0).toFixed(2)),
+            valorTotal: Number((item.valor_total || 0).toFixed(2)),
           })) : prev.itens;
 
           return {
@@ -752,7 +759,7 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
                           type="number"
                           step="0.01"
                           min="0"
-                          value={item.valorUnitario}
+                          value={item.valorUnitario.toFixed(2)}
                           onChange={(e) => handleItemChange(index, 'valorUnitario', e.target.value)}
                           placeholder="0.00"
                           className={`w-full px-2 py-1 bg-white border rounded-md shadow-sm focus:ring-1 focus:ring-red-500 focus:border-red-500 text-sm text-gray-900 placeholder-gray-500 ${

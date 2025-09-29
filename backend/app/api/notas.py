@@ -103,7 +103,8 @@ async def list_notas(
     total = query_obj.count()
     offset = (page - 1) * page_size
     
-    notas = query_obj.offset(offset).limit(page_size).all()
+    #notas = query_obj.offset(offset).limit(page_size).all()
+    notas = query_obj.order_by(Nota.created_at.desc()).offset(offset).limit(page_size).all()
     
     # Buscar fornecedor e itens para cada nota
     items = []
@@ -394,10 +395,30 @@ async def create_nota(
         
         # Criar os itens da nota com lógica de matéria-prima
         for item_data in nota_data.itens:
-            # Buscar matéria-prima existente pelo nome
+            # Buscar matéria-prima existente pelo nome - LÓGICA MELHORADA
+            # Limpar o nome da nota para busca mais flexível
+            nome_limpo = item_data.nome_no_documento.replace('-', '').replace('(', '').replace(')', '').strip()
             materia_prima = db.query(MateriaPrima).filter(
-                MateriaPrima.nome == item_data.nome_no_documento
+                MateriaPrima.nome.ilike(f"%{nome_limpo}%")
             ).first()
+            
+            # Se não encontrou, tentar busca mais específica
+            if not materia_prima:
+                # Buscar por partes do nome
+                partes_nome = nome_limpo.split()
+                if len(partes_nome) >= 2:
+                    # Buscar por "FIO 2.0X7.0" + "CANTO QUADRADO"
+                    parte_principal = " ".join(partes_nome[:2])  # "FIO 2.0X7.0"
+                    parte_secundaria = " ".join(partes_nome[2:])  # "CANTO QUADRADO"
+                    
+                    materia_prima = db.query(MateriaPrima).filter(
+                        and_(
+                            MateriaPrima.nome.ilike(f"%{parte_principal}%"),
+                            MateriaPrima.nome.ilike(f"%{parte_secundaria}%")
+                        )
+                    ).first()
+            
+            print(f"Buscando matéria-prima: '{nome_limpo}' -> Encontrada: {materia_prima.nome if materia_prima else 'NÃO ENCONTRADA'}")
             
             materia_prima_id = None
             if materia_prima:
@@ -427,6 +448,22 @@ async def create_nota(
                         nota_id=nota.id
                     )
                     db.add(novo_preco)
+                    print(f"Preço atualizado para {materia_prima.nome}: R$ {item_data.valor_unitario}")
+            
+            # Verificar se a unidade existe, se não, criar automaticamente
+            unidade = db.query(Unidade).filter(Unidade.codigo == item_data.unidade_codigo).first()
+            if not unidade:
+                # Criar unidade automaticamente
+                unidade = Unidade(
+                    codigo=item_data.unidade_codigo,
+                    descricao=item_data.unidade_codigo.upper(),  # Usar o código como descrição
+                    fator_para_menor=1.0,
+                    menor_unidade_id=None,
+                    is_base=True
+                )
+                db.add(unidade)
+                db.flush()  # Para obter o ID
+                print(f"Unidade '{item_data.unidade_codigo}' criada automaticamente")
             
             # Criar item da nota
             item = NotaItem(
@@ -917,4 +954,4 @@ async def fetch_nota_by_api_key(
         "message": "Funcionalidade em desenvolvimento",
         "api_key": api_key,
         "chave_acesso": chave_acesso
-    } 
+    }

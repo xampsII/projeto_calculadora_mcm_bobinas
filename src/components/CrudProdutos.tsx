@@ -523,7 +523,8 @@ const CrudProdutos: React.FC = () => {
       );
       
       // SEMPRE usar o valor das matérias-primas disponíveis, nunca o salvo no componente
-      const valorUnitario = materiaPrimaDisponivel?.valorUnitario || 0;
+      // Se não encontrar, usar o valor salvo no componente ou um valor mínimo
+      const valorUnitario = materiaPrimaDisponivel?.valorUnitario || comp.valorUnitario || 0.01;
       const quantidade = comp.quantidade || 0;
       
       console.log('Mapeando componente:', {

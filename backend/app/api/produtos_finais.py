@@ -76,8 +76,9 @@ async def listar_materias_primas_disponiveis(
             # Buscar preço atual usando a view
             preco_query = text("""
                 SELECT valor_unitario 
-                FROM vw_precos_atuais 
-                WHERE materia_prima_id = :materia_id
+                FROM materia_prima_precos  
+                WHERE materia_prima_id = :materia_id 
+                AND (vigente_ate IS NULL OR vigente_ate > NOW())
                 ORDER BY vigente_desde DESC 
                 LIMIT 1
             """)
@@ -626,11 +627,12 @@ async def listar_produtos_finais(
                     ).first()
                 
                 if materia_prima:
-                    # Buscar preço atual usando a view
+                    # Buscar preço atual usando a tabela
                     preco_query = text("""
                         SELECT valor_unitario 
-                        FROM vw_precos_atuais 
-                        WHERE materia_prima_id = :materia_id
+                        FROM materia_prima_precos 
+                        WHERE materia_prima_id = :materia_id 
+                        AND (vigente_ate IS NULL OR vigente_ate > NOW())
                         ORDER BY vigente_desde DESC 
                         LIMIT 1
                     """)
@@ -715,11 +717,12 @@ async def calcular_preco_produto(
                 ).first()
             
             if materia_prima:
-                # Buscar preço atual usando a view
+                # Buscar preço atual usando a tabela
                 preco_query = text("""
                     SELECT valor_unitario 
-                    FROM vw_precos_atuais 
-                    WHERE materia_prima_id = :materia_id
+                    FROM materia_prima_precos 
+                    WHERE materia_prima_id = :materia_id 
+                    AND (vigente_ate IS NULL OR vigente_ate > NOW())
                     ORDER BY vigente_desde DESC 
                     LIMIT 1
                 """)
@@ -830,8 +833,9 @@ async def atualizar_produto_final(
                     if materia_prima:
                         preco_query = text("""
                             SELECT valor_unitario 
-                            FROM vw_precos_atuais 
-                            WHERE materia_prima_id = :materia_id
+                            FROM materia_prima_precos 
+                            WHERE materia_prima_id = :materia_id 
+                            AND (vigente_ate IS NULL OR vigente_ate > NOW())
                             ORDER BY vigente_desde DESC 
                             LIMIT 1
                         """)
@@ -869,8 +873,9 @@ async def atualizar_produto_final(
                     if materia_prima:
                         preco_query = text("""
                             SELECT valor_unitario 
-                            FROM vw_precos_atuais 
-                            WHERE materia_prima_id = :materia_id
+                            FROM materia_prima_precos 
+                            WHERE materia_prima_id = :materia_id 
+                            AND (vigente_ate IS NULL OR vigente_ate > NOW())
                             ORDER BY vigente_desde DESC 
                             LIMIT 1
                         """)
