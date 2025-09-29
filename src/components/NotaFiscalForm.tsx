@@ -127,7 +127,7 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
     } else {
       formData.itens.forEach((item, index) => {
         if (!item.materiaPrimaNome.trim()) newErrors[`item-${index}-materiaPrimaNome`] = 'Nome da matéria-prima é obrigatório';
-        if (!item.unidadeMedida.trim()) newErrors[`item-${index}-unidadeMedida`] = 'Unidade de medida é obrigatória';
+        if (!item.unMedida.trim()) newErrors[`item-${index}-unidadeMedida`] = 'Unidade de medida é obrigatória';
         if (!item.quantidade || item.quantidade <= 0) newErrors[`item-${index}-quantidade`] = 'Quantidade deve ser maior que zero';
         if (!item.valorUnitario || item.valorUnitario <= 0) newErrors[`item-${index}-valorUnitario`] = 'Valor unitário deve ser maior que zero';
       });
@@ -209,7 +209,7 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
         valor_total: formData.itens.reduce((acc, item) => acc + item.valorTotal, 0),
         itens: formData.itens.map(item => ({
           nome_no_documento: item.materiaPrimaNome,
-          unidade_codigo: item.unidadeMedida,
+          unidade_codigo: item.unMedida,
           quantidade: item.quantidade,
           valor_unitario: item.valorUnitario,
           valor_total: item.valorTotal
@@ -275,13 +275,13 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
     setImportLoading(true);
     try {
       const result = await importarNotasFiscais(file);
-      if (result.success && result.dados) {
+      if (result.success && result.dados_extraidos) {
         // Preencher o formulário com os dados extraídos do XML
         setFormData(prev => {
-          const novosItens = result.dados.itens ? result.dados.itens.map((item: any, index: number) => ({
+          const novosItens = result.dados_extraidos.itens ? result.dados_extraidos.itens.map((item: any, index: number) => ({
             id: `xml-${index}`,
             materiaPrimaNome: item.descricao || '',
-            unidadeMedida: item.unidade || '',
+            unidadeMedida: item.un || '',
             quantidade: item.quantidade || 0,
             valorUnitario: item.valor_unitario || 0,
             valorTotal: item.valor_total || 0,
@@ -289,12 +289,12 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
 
           return {
             ...prev,
-            numeroNota: result.dados.numero || prev.numeroNota,
-            fornecedorNome: result.dados.fornecedor?.nome || prev.fornecedorNome,
-            cnpjFornecedor: result.dados.fornecedor?.cnpj || prev.cnpjFornecedor,
-            enderecoFornecedor: result.dados.fornecedor?.endereco || prev.enderecoFornecedor,
-            dataEmissao: result.dados.emissao_date ? new Date(result.dados.emissao_date).toISOString().split('T')[0] : prev.dataEmissao,
-            valorTotal: result.dados.valor_total || prev.valorTotal,
+            numeroNota: result.dados_extraidos.numero_nota || prev.numeroNota,
+            fornecedorNome: result.dados_extraidos.fornecedor || prev.fornecedorNome,
+            cnpjFornecedor: result.dados_extraidos.cnpj_fornecedor || prev.cnpjFornecedor,
+            enderecoFornecedor: result.dados_extraidos.endereco_fornecedor || prev.enderecoFornecedor,
+            dataEmissao: result.dados_extraidos.data_emissao || prev.dataEmissao,
+            valorTotal: result.dados_extraidos.valor_total || prev.valorTotal,
             itens: novosItens,
           };
         });
@@ -692,7 +692,7 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
                       </td>
                       <td className="p-2">
                         <select
-                          value={item.unidadeMedida}
+                          value={item.unMedida}
                           onChange={e => {
                             handleItemChange(index, 'unidadeMedida', e.target.value);
                             if (e.target.value !== 'outro') setCustomUnidades(prev => ({ ...prev, [index]: '' }));
@@ -704,7 +704,7 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
                             <option key={opt.value} value={opt.value}>{opt.label}</option>
                           ))}
                         </select>
-                        {item.unidadeMedida === 'outro' && (
+                        {item.unMedida === 'outro' && (
                           <input
                             type="text"
                             className="mt-2 w-full px-2 py-1 bg-white border rounded-md shadow-sm focus:ring-1 focus:ring-red-500 focus:border-red-500 text-sm text-gray-900"
