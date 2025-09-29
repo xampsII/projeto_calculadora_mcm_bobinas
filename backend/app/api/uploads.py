@@ -68,6 +68,17 @@ def extrair_dados_nfe_regex(texto: str) -> dict:
                 dados['fornecedor'] = nome
                 break
     
+    # CNPJ do fornecedor
+    cnpj_patterns = [
+        r'CNPJ[:\s]*(\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2})',
+        r'(\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2})',
+    ]
+    for pattern in cnpj_patterns:
+        cnpj_match = re.search(pattern, texto)
+        if cnpj_match:
+            dados['cnpj_fornecedor'] = cnpj_match.group(1)
+            break
+    
     # Valor total - mais flexível
     valor_patterns = [
         r'VALOR\s+TOTAL[:\s]*R?\$?\s*([\d.,]+)',
@@ -143,7 +154,7 @@ def extrair_itens_produtos(texto: str) -> List[Dict]:
                     "descricao": descricao.strip(),
                     "ncm": ncm,
                     "cfop": cfop,
-                    "un": unidade,
+                    "un": unidade.lower(),  # Converter para minúsculo
                     "quantidade": quantidade,
                     "valor_unitario": valor_unitario,
                     "valor_total": valor_total,
@@ -270,4 +281,4 @@ async def teste_pdf(file: UploadFile = File(...)):
         return {
             "success": False,
             "erro": str(e)
-    } 
+        }

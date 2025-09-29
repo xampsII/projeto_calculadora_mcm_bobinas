@@ -210,7 +210,7 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
         valor_total: formData.itens.reduce((acc, item) => acc + item.valorTotal, 0),
         itens: formData.itens.map(item => ({
           nome_no_documento: item.materiaPrimaNome,
-          unidade_codigo: item.unidadeMedida,
+          unidade_codigo: item.unidadeMedida.toLowerCase(), // Converter para minúsculo
           quantidade: item.quantidade,
           valor_unitario: item.valorUnitario,
           valor_total: item.valorTotal

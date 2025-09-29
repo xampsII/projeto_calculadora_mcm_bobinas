@@ -15,6 +15,7 @@ from app.models import load_all_models
 from app.api import integracoes_router, usuarios_router, fornecedores_router, produtos_router, produtos_finais_router
 from app.api.uploads import router as uploads_router
 from app.api.notas import router as notas_router
+from app.api.unidades import router as unidades_router
 
 # Configuração de logging
 logging.basicConfig(
@@ -80,10 +81,10 @@ cors_origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "*"],  
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With", "Access-Control-Request-Method", "Access-Control-Request-Headers"],
 )
 
 
@@ -215,6 +216,15 @@ async def test_endpoint():
         "cors_origins": settings.cors_origins_list
     }
 
+# Test endpoint para debug
+@app.post("/test-notas")
+async def test_notas():
+    """Endpoint de teste para debug"""
+    return {
+        "message": "Teste OK!",
+        "timestamp": time.time()
+    }
+
 
 # Root endpoint
 @app.get("/")
@@ -236,6 +246,7 @@ app.include_router(fornecedores_router)
 app.include_router(produtos_router)
 app.include_router(produtos_finais_router)
 app.include_router(uploads_router)
+app.include_router(unidades_router)
 
 
 if __name__ == "__main__":

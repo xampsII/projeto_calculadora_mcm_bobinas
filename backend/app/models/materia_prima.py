@@ -13,7 +13,7 @@ class MateriaPrima(Base):
     menor_unidade_codigo: Mapped[Optional[str]] = mapped_column(String(10), ForeignKey("unidades.codigo"), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default="now()")
-    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), onupdate=None)
+    updated_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), onupdate=None, nullable=True)
     
     # Relationships
     unidade: Mapped["Unidade"] = relationship("Unidade", foreign_keys=[unidade_codigo], back_populates="materias_primas")
@@ -39,7 +39,7 @@ class MateriaPrimaPreco(Base):
     # )
     fornecedor_id: Mapped[int | None] = mapped_column(ForeignKey("fornecedor.id_fornecedor"), nullable=True)
     nota_id: Mapped[int | None] = mapped_column(ForeignKey("notas.id"), nullable=True)
-    observacao: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # observacao: Mapped[str | None] = mapped_column(String(500), nullable=True)  # Coluna não existe no banco
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default="now()")
     
     # Relationships
