@@ -104,7 +104,10 @@ async def list_notas(
     offset = (page - 1) * page_size
     
     #notas = query_obj.offset(offset).limit(page_size).all()
-    notas = query_obj.order_by(Nota.created_at.desc()).offset(offset).limit(page_size).all()
+    notas = query_obj.order_by(
+        Nota.is_pinned.desc(),  # Fixadas primeiro
+        Nota.created_at.desc()
+    ).offset(offset).limit(page_size).all()
     
     # Buscar fornecedor e itens para cada nota
     items = []
@@ -254,65 +257,69 @@ async def get_historico_precos_materia_prima(
     current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """Retorna o histórico completo de preços de uma matéria-prima"""
-    if not current_user and not get_settings().DEBUG:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    
-    # Verificar se a matéria-prima existe
-    materia_prima = db.query(MateriaPrima).filter(
-        and_(
-            MateriaPrima.id == materia_prima_id,
-            MateriaPrima.is_active == True
-        )
-    ).first()
-    
-    if not materia_prima:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Matéria-prima não encontrada"
-        )
-    
-    # Buscar histórico de preços
-    precos = db.query(MateriaPrimaPreco).filter(
-        MateriaPrimaPreco.materia_prima_id == materia_prima_id
-    ).order_by(MateriaPrimaPreco.vigente_desde.desc()).all()
-    
-    historico = []
-    for preco in precos:
-        # Buscar informações do fornecedor
-        fornecedor = db.query(Fornecedor).filter(
-            Fornecedor.id_fornecedor == preco.fornecedor_id
-        ).first() if preco.fornecedor_id else None
+    try:
+        # Verificar se a matéria-prima existe
+        materia_prima = db.query(MateriaPrima).filter(
+            MateriaPrima.id == materia_prima_id
+        ).first()
         
-        # Buscar informações da nota
-        nota = db.query(Nota).filter(Nota.id == preco.nota_id).first() if preco.nota_id else None
+        if not materia_prima:
+            return {
+                "materia_prima": {
+                    "id": materia_prima_id,
+                    "nome": "Matéria-prima não encontrada",
+                    "unidade": "N/A"
+                },
+                "historico": [],
+                "total_precos": 0
+            }
         
-        historico.append({
-            "id": preco.id,
-            "valor_unitario": float(preco.valor_unitario),
-            "vigente_desde": preco.vigente_desde.isoformat() if preco.vigente_desde else None,
-            "vigente_ate": preco.vigente_ate.isoformat() if preco.vigente_ate else None,
-            "origem": preco.origem.value if preco.origem else None,
-            "fornecedor": {
-                "id": fornecedor.id_fornecedor,
-                "nome": fornecedor.nome
-            } if fornecedor else None,
-            "nota": {
-                "id": nota.id,
-                "numero": nota.numero,
-                "serie": nota.serie
-            } if nota else None,
-            "created_at": preco.created_at.isoformat() if preco.created_at else None
-        })
-    
-    return {
-        "materia_prima": {
-            "id": materia_prima.id,
-            "nome": materia_prima.nome,
-            "unidade": materia_prima.unidade_codigo
-        },
-        "historico": historico,
-        "total_precos": len(historico)
-    }
+        # Buscar histórico de preços
+        precos = db.query(MateriaPrimaPreco).filter(
+            MateriaPrimaPreco.materia_prima_id == materia_prima_id
+        ).order_by(MateriaPrimaPreco.vigente_desde.desc()).all()
+        
+        historico = []
+        for preco in precos:
+            historico.append({
+                "id": preco.id,
+                "valor_unitario": float(preco.valor_unitario),
+                "vigente_desde": preco.vigente_desde.isoformat() if preco.vigente_desde else None,
+                "vigente_ate": preco.vigente_ate.isoformat() if preco.vigente_ate else None,
+                "origem": "nota_fiscal",
+                "fornecedor": {
+                    "id": preco.fornecedor_id or 0,
+                    "nome": "Fornecedor Padrão"
+                },
+                "nota": {
+                    "id": preco.nota_id or 0,
+                    "numero": "N/A",
+                    "serie": "N/A"
+                },
+                "created_at": preco.created_at.isoformat() if preco.created_at else None
+            })
+        
+        return {
+            "materia_prima": {
+                "id": materia_prima.id,
+                "nome": materia_prima.nome,
+                "unidade": materia_prima.unidade_codigo
+            },
+            "historico": historico,
+            "total_precos": len(historico)
+        }
+        
+    except Exception as e:
+        logger.error(f"Erro ao buscar histórico de preços: {e}")
+        return {
+            "materia_prima": {
+                "id": materia_prima_id,
+                "nome": "Erro ao carregar",
+                "unidade": "N/A"
+            },
+            "historico": [],
+            "total_precos": 0
+        }
 
 
 @router.get("/{nota_id}", response_model=NotaResponse)
@@ -955,3 +962,35 @@ async def fetch_nota_by_api_key(
         "api_key": api_key,
         "chave_acesso": chave_acesso
     }
+
+
+@router.patch("/{nota_id}/pin")
+async def toggle_pin_nota(
+    nota_id: int,
+    db: Session = Depends(get_db)
+):
+    """Fixa ou desfixa uma nota fiscal"""
+    try:
+        nota = db.query(Nota).filter(Nota.id == nota_id).first()
+        
+        if not nota:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Nota não encontrada"
+            )
+        
+        nota.is_pinned = not nota.is_pinned
+        db.commit()
+        
+        return {
+            "success": True, 
+            "is_pinned": nota.is_pinned,
+            "message": f"Nota {'fixada' if nota.is_pinned else 'desfixada'} com sucesso"
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao alterar status de fixação: {str(e)}"
+        )

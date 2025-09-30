@@ -16,6 +16,7 @@ from app.api import integracoes_router, usuarios_router, fornecedores_router, pr
 from app.api.uploads import router as uploads_router
 from app.api.notas import router as notas_router
 from app.api.unidades import router as unidades_router
+from app.api.materias_primas import router as materias_primas_router
 
 # Configuração de logging
 logging.basicConfig(
@@ -81,10 +82,10 @@ cors_origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "*"],  
+    allow_origins=["*"],  
     allow_credentials=False,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With", "Access-Control-Request-Method", "Access-Control-Request-Headers"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -247,6 +248,7 @@ app.include_router(produtos_router)
 app.include_router(produtos_finais_router)
 app.include_router(uploads_router)
 app.include_router(unidades_router)
+app.include_router(materias_primas_router)
 
 
 if __name__ == "__main__":

@@ -4,12 +4,12 @@ import NotaFiscalList from './components/NotaFiscalList';
 import NotaFiscalForm from './components/NotaFiscalForm';
 import HistoricoPrecos from './components/HistoricoPrecos';
 import CrudMateriasPrimas from './components/CrudMateriasPrimas';
-import CrudFornecedores from './components/CrudFornecedores';
+// import CrudFornecedores from './components/CrudFornecedores'; // Oculto temporariamente
 import CrudProdutos from './components/CrudProdutos';
 import { AppProvider } from './context/AppContext';
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'produtos' | 'cadastro' | 'historico' | 'materias' | 'fornecedores' | 'notas'>('produtos');
+  const [activeTab, setActiveTab] = useState<'produtos' | 'cadastro' | 'historico' | 'notas' | 'materias'>('produtos');
   const [notaEditandoId, setNotaEditandoId] = useState<string | undefined>();
 
   const handleNovaNotaClick = () => {
@@ -47,10 +47,10 @@ function App() {
             onVoltar={handleVoltarParaLista}
           />
         )}
-        {activeTab === 'historico' && <HistoricoPrecos />}
-        {activeTab === 'materias' && <CrudMateriasPrimas />}
-        {activeTab === 'fornecedores' && <CrudFornecedores />}
-        {activeTab === 'produtos' && <CrudProdutos />}
+                {activeTab === 'historico' && <HistoricoPrecos />}
+                {activeTab === 'materias' && <CrudMateriasPrimas />}
+                {/* {activeTab === 'fornecedores' && <CrudFornecedores />} */}
+                {activeTab === 'produtos' && <CrudProdutos />}
       </Layout>
     </AppProvider>
   );

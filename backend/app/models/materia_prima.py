@@ -13,7 +13,7 @@ class MateriaPrima(Base):
     menor_unidade_codigo: Mapped[Optional[str]] = mapped_column(String(10), ForeignKey("unidades.codigo"), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default="now()")
-    updated_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), onupdate=None, nullable=True)
+    updated_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), server_default="now()", onupdate="now()", nullable=True)
     
     # Relationships
     unidade: Mapped["Unidade"] = relationship("Unidade", foreign_keys=[unidade_codigo], back_populates="materias_primas")

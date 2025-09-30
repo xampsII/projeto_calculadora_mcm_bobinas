@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Plus, Eye, Edit2, Calendar, Building, FileText } from 'lucide-react';
+import { Search, Filter, Plus, Eye, Edit2, Calendar, Building, FileText, Pin } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { NotaFiscalFilters, NotaFiscal } from '../types';
 import { formatCurrency, formatDate, formatCNPJ } from '../utils/formatters';
@@ -34,6 +34,27 @@ const NotaFiscalList: React.FC<NotaFiscalListProps> = ({ onNovaNota, onEditarNot
   });
 
   const [showFilters, setShowFilters] = useState(false);
+
+  const handleTogglePin = async (notaId: string) => {
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/notas/${notaId}/pin`, {
+        method: 'PATCH',
+      });
+      if (response.ok) {
+        loadNotas(); // Recarregar lista
+        setNotification({
+          message: 'Status de fixação alterado com sucesso!',
+          type: 'success'
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao fixar nota:', error);
+      setNotification({
+        message: 'Erro ao alterar status de fixação.',
+        type: 'error'
+      });
+    }
+  };
 
   const loadNotas = async () => {
     setLoading(true);
@@ -279,6 +300,13 @@ const NotaFiscalList: React.FC<NotaFiscalListProps> = ({ onNovaNota, onEditarNot
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex justify-end space-x-2">
+                          <button
+                            onClick={() => handleTogglePin(nota.id)}
+                            className={`${nota.is_pinned ? 'text-yellow-600' : 'text-gray-400'} hover:text-yellow-800 transition-colors`}
+                            title={nota.is_pinned ? "Desafixar" : "Fixar"}
+                          >
+                            <Pin className="h-4 w-4" fill={nota.is_pinned ? 'currentColor' : 'none'} />
+                          </button>
                           <button
                             onClick={() => onVerNota(nota.id)}
                             className="text-blue-600 hover:text-blue-800 transition-colors"

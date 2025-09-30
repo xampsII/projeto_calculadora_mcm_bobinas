@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Save, Upload, FileText, Loader2, Plus, Trash2, Key, Download } from 'lucide-react';
+import { Save, Upload, Loader2, Plus, Trash2, Download } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { NotaFiscal, NotaFiscalItem } from '../types';
-import { formatCNPJ, validateCNPJ, formatCurrency, parseCurrency } from '../utils/formatters';
+import { formatCNPJ, validateCNPJ, formatCurrency } from '../utils/formatters';
 import Breadcrumb from './ui/Breadcrumb';
 import NotificationToast from './NotificationToast';
 
@@ -40,22 +40,16 @@ const UNIDADES_OPCOES = [
 
 const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSalvar }) => {
   const { 
-    unidadesMedida, 
     adicionarNotaFiscal, 
     atualizarNotaFiscal, 
     obterNotaFiscal,
-    importarNotasFiscais,
-    buscarNotaPorChaveAPI
+    importarNotasFiscais
   } = useApp();
   
-  const [activeMode, setActiveMode] = useState<'manual' | 'import' | 'api'>('manual');
-  const [currentStep, setCurrentStep] = useState(1);
+  const [activeMode, setActiveMode] = useState<'import'>('import');
   const [loading, setLoading] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
-  const [apiLoading, setApiLoading] = useState(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [dadosExtraidos, setDadosExtraidos] = useState<any>(null);
-  const [apiKey, setApiKey] = useState('');
   const [customUnidades, setCustomUnidades] = useState<{[key: number]: string}>({});
 
   const [formData, setFormData] = useState({
@@ -328,42 +322,6 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
     }
   };
 
-  const handleApiSearch = async () => {
-    if (!apiKey.trim()) {
-      setNotification({
-        message: 'Informe a chave de acesso.',
-        type: 'error',
-      });
-      return;
-    }
-
-    setApiLoading(true);
-    try {
-      const result = await buscarNotaPorChaveAPI(apiKey);
-      if (result.success && result.data) {
-        setFormData(prev => ({
-          ...prev,
-          ...result.data,
-        }));
-        setNotification({
-          message: result.message,
-          type: 'success',
-        });
-      } else {
-        setNotification({
-          message: result.message,
-          type: 'error',
-        });
-      }
-    } catch (error) {
-      setNotification({
-        message: 'Erro ao buscar nota via API.',
-        type: 'error',
-      });
-    } finally {
-      setApiLoading(false);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -384,49 +342,10 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
       />
 
       {/* Steps */}
-      <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-        <div className="flex items-center justify-center space-x-8">
-          {[
-            { step: 1, label: 'Dados da Nota' },
-            { step: 2, label: 'Itens' },
-            { step: 3, label: 'Revisão' },
-          ].map(({ step, label }) => (
-            <div key={step} className="flex items-center">
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                  currentStep >= step
-                    ? 'bg-red-600 text-white'
-                    : 'bg-gray-300 text-gray-600'
-                }`}
-              >
-                {step}
-              </div>
-              <span className={`ml-2 text-sm ${currentStep >= step ? 'text-gray-900' : 'text-gray-500'}`}>
-                {label}
-              </span>
-              {step < 3 && <div className="w-16 h-px bg-gray-300 ml-4" />}
-            </div>
-          ))}
-        </div>
-      </div>
 
-      {/* Mode Toggle */}
+      {/* Mode Toggle - Apenas Importar Arquivo */}
       <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
         <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg w-fit">
-          <button
-            type="button"
-            onClick={() => setActiveMode('manual')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-              activeMode === 'manual'
-                ? 'bg-red-600 text-white shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <div className="flex items-center space-x-2">
-              <FileText className="h-4 w-4" />
-              <span>Cadastro Manual</span>
-            </div>
-          </button>
           <button
             type="button"
             onClick={() => setActiveMode('import')}
@@ -439,20 +358,6 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
             <div className="flex items-center space-x-2">
               <Upload className="h-4 w-4" />
               <span>Importar Arquivo</span>
-            </div>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveMode('api')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-              activeMode === 'api'
-                ? 'bg-red-600 text-white shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <div className="flex items-center space-x-2">
-              <Key className="h-4 w-4" />
-              <span>Buscar por API</span>
             </div>
           </button>
         </div>
@@ -502,46 +407,6 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
         </div>
       )}
 
-      {/* API Section */}
-      {activeMode === 'api' && (
-        <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            Buscar Nota por Chave API
-          </h3>
-          <div className="flex items-end space-x-4">
-            <div className="flex-1">
-              <label htmlFor="api-key" className="block text-sm font-medium text-gray-700 mb-2">
-                Chave de Acesso
-              </label>
-              <input
-                type="text"
-                id="api-key"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="Digite a chave de acesso da nota fiscal"
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-red-500 focus:border-red-500"
-              />
-            </div>
-            <button
-              onClick={handleApiSearch}
-              disabled={apiLoading}
-              className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 disabled:from-gray-600 disabled:to-gray-700 text-white px-6 py-2 rounded-lg font-medium flex items-center space-x-2 transition-all"
-            >
-              {apiLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Buscando...</span>
-                </>
-              ) : (
-                <>
-                  <Key className="h-4 w-4" />
-                  <span>Buscar Nota</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Form Section */}
       <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">

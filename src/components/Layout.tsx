@@ -3,8 +3,8 @@ import { History, Upload, Package, Users, ShoppingCart, FileText } from 'lucide-
 
 interface LayoutProps {
   children: React.ReactNode;
-  activeTab: 'notas' | 'cadastro' | 'historico' | 'materias' | 'fornecedores' | 'produtos';
-  onTabChange: (tab: 'notas' | 'cadastro' | 'historico' | 'materias' | 'fornecedores' | 'produtos') => void;
+  activeTab: 'notas' | 'cadastro' | 'historico' | 'produtos' | 'materias';
+  onTabChange: (tab: 'notas' | 'cadastro' | 'historico' | 'produtos' | 'materias') => void;
 }
 
 const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => {
@@ -91,6 +91,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
                 <span>Matérias-Primas</span>
               </div>
             </button>
+            {/* Fornecedores oculto temporariamente */}
+            {/* 
             <button
               onClick={() => onTabChange('fornecedores')}
               className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
@@ -104,6 +106,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => 
                 <span>Fornecedores</span>
               </div>
             </button>
+            */}
           </div>
         </div>
       </nav>

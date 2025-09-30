@@ -58,7 +58,7 @@ class MateriaPrimaResponse(BaseModel):
     vigente_desde: Optional[str] = None
     
     # Histórico completo
-    precos: List[MateriaPrimaPrecoResponse] = []
+    precos: Optional[List[MateriaPrimaPrecoResponse]] = []
 
     class Config:
         from_attributes = True 

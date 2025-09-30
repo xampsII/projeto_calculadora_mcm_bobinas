@@ -84,6 +84,7 @@ class NotaResponse(BaseModel):
     file_hash: Optional[str] = None
     status: StatusNota
     is_active: bool
+    is_pinned: bool = False
     created_at: str
     updated_at: Optional[str] = None
     

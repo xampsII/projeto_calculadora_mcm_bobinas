@@ -1,12 +1,103 @@
-import React, { useState } from 'react';
-import { Search, TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import { useApp } from '../context/AppContext';
+import React, { useState, useEffect } from 'react';
+import { Search, TrendingUp, TrendingDown, Minus, Loader2 } from 'lucide-react';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+
+interface MateriaPrima {
+  id: number;
+  nome: string;
+  unidade_codigo: string;
+}
+
+interface HistoricoPreco {
+  id: number;
+  valor_unitario: number;
+  vigente_desde: string;
+  vigente_ate: string | null;
+  nota_id: number | null;
+  fornecedor: {
+    id: number;
+    nome: string;
+  } | null;
+  nota: {
+    id: number;
+    numero: string;
+    serie: string;
+  } | null;
+  created_at: string;
+}
+
+interface HistoricoResponse {
+  materia_prima: {
+    id: number;
+    nome: string;
+    unidade: string;
+  };
+  historico: HistoricoPreco[];
+  total_precos: number;
+}
 
 const HistoricoPrecos: React.FC = () => {
-  const { materiasPrimas, obterHistoricoPorMateria } = useApp();
-  const [materiaSelecionada, setMateriaSelecionada] = useState('');
+  const [materiasPrimas, setMateriasPrimas] = useState<MateriaPrima[]>([]);
+  const [materiaSelecionada, setMateriaSelecionada] = useState<string>('');
+  const [historico, setHistorico] = useState<HistoricoResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [loadingHistorico, setLoadingHistorico] = useState(false);
 
-  const historico = materiaSelecionada ? obterHistoricoPorMateria(materiaSelecionada) : [];
+  // Carregar matérias-primas
+  const carregarMateriasPrimas = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/produtos-finais/materias-primas-disponiveis`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      // Converter formato para compatibilidade
+      const materiasFormatadas = data.map((item: any) => ({
+        id: item.id,
+        nome: item.nome,
+        unidade_codigo: item.unidade || 'kg'
+      }));
+      setMateriasPrimas(materiasFormatadas);
+    } catch (error) {
+      console.error('Erro ao carregar matérias-primas:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Carregar histórico de preços
+  const carregarHistorico = async (materiaPrimaId: string) => {
+    setLoadingHistorico(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/notas/materia-prima/${materiaPrimaId}/historico-precos`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setHistorico(data);
+    } catch (error) {
+      console.error('Erro ao carregar histórico:', error);
+      setHistorico(null);
+    } finally {
+      setLoadingHistorico(false);
+    }
+  };
+
+  // Carregar matérias-primas ao montar o componente
+  useEffect(() => {
+    carregarMateriasPrimas();
+  }, []);
+
+  // Carregar histórico quando matéria-prima for selecionada
+  useEffect(() => {
+    if (materiaSelecionada) {
+      carregarHistorico(materiaSelecionada);
+    } else {
+      setHistorico(null);
+    }
+  }, [materiaSelecionada]);
 
   const formatarMoeda = (valor: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -16,7 +107,13 @@ const HistoricoPrecos: React.FC = () => {
   };
 
   const formatarData = (data: string) => {
-    return new Date(data).toLocaleDateString('pt-BR');
+    return new Date(data).toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   const calcularVariacao = (valorAtual: number, valorAnterior?: number) => {
@@ -50,33 +147,46 @@ const HistoricoPrecos: React.FC = () => {
           <label htmlFor="materia-select" className="block text-sm font-medium text-gray-700 mb-2">
             Selecione a matéria-prima
           </label>
-          <select
-            id="materia-select"
-            value={materiaSelecionada}
-            onChange={(e) => setMateriaSelecionada(e.target.value)}
-            className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-red-500 focus:border-red-500"
-          >
-            <option value="">Escolha uma matéria-prima</option>
-            {materiasPrimas.map((materia) => (
-              <option key={materia.id} value={materia.id}>
-                {materia.nome}
-              </option>
-            ))}
-          </select>
+          <div className="relative">
+            <select
+              id="materia-select"
+              value={materiaSelecionada}
+              onChange={(e) => setMateriaSelecionada(e.target.value)}
+              className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-red-500 focus:border-red-500"
+              disabled={loading}
+            >
+              <option value="">Escolha uma matéria-prima</option>
+              {materiasPrimas.map((materia) => (
+                <option key={materia.id} value={materia.id.toString()}>
+                  {materia.nome} ({materia.unidade_codigo})
+                </option>
+              ))}
+            </select>
+            {loading && (
+              <div className="absolute right-3 top-2.5">
+                <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Tabela de histórico */}
         {materiaSelecionada && (
           <div className="overflow-hidden border border-gray-200 rounded-lg">
-            {historico.length > 0 ? (
+            {loadingHistorico ? (
+              <div className="px-6 py-8 text-center">
+                <Loader2 className="mx-auto h-8 w-8 animate-spin text-red-600 mb-4" />
+                <p className="text-gray-600">Carregando histórico...</p>
+              </div>
+            ) : historico && historico.historico.length > 0 ? (
               <>
                 {/* Header da tabela */}
                 <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
                   <h3 className="text-lg font-medium text-gray-900">
-                    Histórico de Preços - {historico[0]?.materiaPrimaNome}
+                    Histórico de Preços - {historico.materia_prima.nome}
                   </h3>
                   <p className="text-sm text-gray-600 mt-1">
-                    {historico.length} registro{historico.length !== 1 ? 's' : ''} encontrado{historico.length !== 1 ? 's' : ''}
+                    {historico.total_precos} registro{historico.total_precos !== 1 ? 's' : ''} encontrado{historico.total_precos !== 1 ? 's' : ''}
                   </p>
                 </div>
 
@@ -86,13 +196,13 @@ const HistoricoPrecos: React.FC = () => {
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Data da Compra
+                          Data de Vigência
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Valor Unitário (Compra)
+                          Valor Unitário
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Valor por Unidade de Uso
+                          Status
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Variação
@@ -100,31 +210,38 @@ const HistoricoPrecos: React.FC = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Fornecedor
                         </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Nota Fiscal
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {historico.map((item) => {
-                        const variacao = calcularVariacao(item.valorUnitario, item.valorAnterior);
+                      {historico.historico.map((item, index) => {
+                        const valorAnterior = index < historico.historico.length - 1 
+                          ? historico.historico[index + 1].valor_unitario 
+                          : undefined;
+                        const variacao = calcularVariacao(item.valor_unitario, valorAnterior);
                         
                         return (
                           <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {formatarData(item.dataCompra)}
+                              {formatarData(item.vigente_desde)}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              {formatarMoeda(item.valorUnitario)}
+                              {formatarMoeda(item.valor_unitario)}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              <div>
-                                <span className="font-medium">{formatarMoeda(item.valorUnitarioConvertido)}</span>
-                                <div className="text-xs text-gray-500">
-                                  por {item.unidadeUso}
-                                </div>
-                              </div>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                item.vigente_ate === null 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {item.vigente_ate === null ? 'ATUAL' : 'HISTÓRICO'}
+                              </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm">
                               <div className="flex items-center space-x-2">
-                                {renderTrendIcon(item.valorUnitario, item.valorAnterior)}
+                                {renderTrendIcon(item.valor_unitario, valorAnterior)}
                                 <span className={`font-medium ${
                                   variacao === null ? 'text-gray-500' :
                                   variacao > 0 ? 'text-red-600' :
@@ -137,14 +254,17 @@ const HistoricoPrecos: React.FC = () => {
                                   }
                                 </span>
                               </div>
-                              {item.valorAnterior && (
+                              {valorAnterior && (
                                 <div className="text-xs text-gray-500 mt-1">
-                                  Anterior: {formatarMoeda(item.valorAnterior)}
+                                  Anterior: {formatarMoeda(valorAnterior)}
                                 </div>
                               )}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {item.fornecedor}
+                              {item.fornecedor?.nome || 'N/A'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {item.nota ? `${item.nota.numero}/${item.nota.serie}` : 'N/A'}
                             </td>
                           </tr>
                         );

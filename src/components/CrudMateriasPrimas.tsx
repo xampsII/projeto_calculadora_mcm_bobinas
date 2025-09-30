@@ -84,10 +84,8 @@ const CrudMateriasPrimas: React.FC = () => {
     try {
       const data = {
         nome: formData.nome.trim(),
-        unidadeCompra: formData.unidadeCompra,
-        unidadeUso: formData.unidadeUso,
-        fatorConversao: parseFloat(formData.fatorConversao),
-        ativo: true,
+        unidade_codigo: formData.unidadeCompra,
+        menor_unidade_codigo: formData.unidadeUso,
       };
 
       let result;
@@ -118,9 +116,9 @@ const CrudMateriasPrimas: React.FC = () => {
   const handleEdit = (materia: any) => {
     setFormData({
       nome: materia.nome,
-      unidadeCompra: materia.unidadeCompra,
-      unidadeUso: materia.unidadeUso,
-      fatorConversao: materia.fatorConversao.toString(),
+      unidadeCompra: materia.unidade_codigo || materia.unidadeCompra,
+      unidadeUso: materia.menor_unidade_codigo || materia.unidadeUso,
+      fatorConversao: "1", // Valor padrão
     });
     setEditingId(materia.id);
     setShowForm(true);

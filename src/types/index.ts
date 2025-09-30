@@ -1,12 +1,11 @@
 export interface MateriaPrima {
   id: string;
   nome: string;
-  unidadeCompra: string;
-  unidadeUso: string;
-  fatorConversao: number;
-  ativo: boolean;
-  createdAt: string;
-  updatedAt: string;
+  unidade_codigo: string;
+  menor_unidade_codigo?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at?: string;
 }
 
 export interface Fornecedor {
@@ -62,6 +61,7 @@ export interface NotaFiscal {
   itens: NotaFiscalItem[];
   createdAt: string;
   updatedAt: string;
+  is_pinned?: boolean;
 }
 
 export interface HistoricoPreco {
@@ -139,6 +139,7 @@ export interface AppContextType {
   buscarNotaPorChaveAPI: (chave: string) => Promise<{ success: boolean; message: string; data?: Partial<NotaFiscal> }>;
   
   // Matérias-primas
+  carregarMateriasPrimas: () => Promise<void>;
   adicionarMateriaPrima: (materia: Omit<MateriaPrima, 'id' | 'createdAt' | 'updatedAt'>) => Promise<{ success: boolean; message: string }>;
   atualizarMateriaPrima: (id: string, materia: Partial<MateriaPrima>) => Promise<{ success: boolean; message: string }>;
   excluirMateriaPrima: (id: string) => Promise<{ success: boolean; message: string }>;

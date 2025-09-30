@@ -16,17 +16,119 @@ def processar_xml_nfe(content: bytes) -> dict:
     """Processa arquivo XML de NFe"""
     try:
         root = ET.fromstring(content)
+        
+        # Definir namespaces da NFe
+        namespaces = {
+            'nfe': 'http://www.portalfiscal.inf.br/nfe'
+        }
+        
         dados = {
-            "numero_nota": "123456",
-            "serie": "1",
-            "valor_total": 100.0,
-            "fornecedor": "Fornecedor Teste",
-            "cnpj_fornecedor": "12345678000123",
+            "numero_nota": "",
+            "serie": "",
+            "chave_acesso": "",
+            "valor_total": 0.0,
+            "fornecedor": "",
+            "cnpj_fornecedor": "",
+            "data_emissao": "",
             "itens": []
         }
+        
+        # Extrair dados básicos da nota
+        chave_acesso = root.find('.//nfe:chNFe', namespaces)
+        if chave_acesso is not None and chave_acesso.text:
+            dados["chave_acesso"] = chave_acesso.text
+        
+        numero = root.find('.//nfe:nNF', namespaces)
+        if numero is not None and numero.text:
+            dados["numero_nota"] = numero.text
+        
+        serie = root.find('.//nfe:serie', namespaces)
+        if serie is not None and serie.text:
+            dados["serie"] = serie.text
+        
+        # Data de emissão
+        dh_emi = root.find('.//nfe:dhEmi', namespaces)
+        if dh_emi is not None and dh_emi.text:
+            try:
+                data_str = dh_emi.text.split('T')[0]
+                dados["data_emissao"] = data_str
+            except:
+                pass
+        
+        # Valor total
+        v_nf = root.find('.//nfe:vNF', namespaces)
+        if v_nf is not None and v_nf.text:
+            try:
+                dados["valor_total"] = float(v_nf.text)
+            except:
+                pass
+        
+        # Dados do emitente (fornecedor)
+        emit_cnpj = root.find('.//nfe:emit/nfe:CNPJ', namespaces)
+        if emit_cnpj is not None and emit_cnpj.text:
+            dados["cnpj_fornecedor"] = emit_cnpj.text
+        
+        emit_nome = root.find('.//nfe:emit/nfe:xNome', namespaces)
+        if emit_nome is not None and emit_nome.text:
+            dados["fornecedor"] = emit_nome.text
+        
+        # Extrair itens da nota
+        itens = root.findall('.//nfe:det', namespaces)
+        for item in itens:
+            try:
+                # Código do produto
+                c_prod = item.find('.//nfe:cProd', namespaces)
+                codigo = c_prod.text if c_prod is not None and c_prod.text else ""
+                
+                # Descrição do produto
+                x_prod = item.find('.//nfe:xProd', namespaces)
+                descricao = x_prod.text if x_prod is not None and x_prod.text else ""
+                
+                # NCM
+                ncm = item.find('.//nfe:NCM', namespaces)
+                ncm_codigo = ncm.text if ncm is not None and ncm.text else ""
+                
+                # CFOP
+                cfop = item.find('.//nfe:CFOP', namespaces)
+                cfop_codigo = cfop.text if cfop is not None and cfop.text else ""
+                
+                # Unidade comercial
+                u_com = item.find('.//nfe:uCom', namespaces)
+                unidade = u_com.text if u_com is not None and u_com.text else "UN"
+                
+                # Quantidade comercial
+                q_com = item.find('.//nfe:qCom', namespaces)
+                quantidade = float(q_com.text) if q_com is not None and q_com.text else 0.0
+                
+                # Valor unitário comercial
+                v_un_com = item.find('.//nfe:vUnCom', namespaces)
+                valor_unitario = float(v_un_com.text) if v_un_com is not None and v_un_com.text else 0.0
+                
+                # Valor total do item
+                v_prod = item.find('.//nfe:vProd', namespaces)
+                valor_total = float(v_prod.text) if v_prod is not None and v_prod.text else 0.0
+                
+                # Adicionar item se tiver dados válidos
+                if descricao and quantidade > 0 and valor_unitario > 0:
+                    dados["itens"].append({
+                        "codigo": codigo,
+                        "descricao": descricao,
+                        "ncm": ncm_codigo,
+                        "cfop": cfop_codigo,
+                        "un": unidade.lower(),
+                        "quantidade": quantidade,
+                        "valor_unitario": valor_unitario,
+                        "valor_total": valor_total
+                    })
+                    
+            except Exception as e:
+                print(f"Erro ao processar item: {e}")
+                continue
+            
         return dados
+        
     except Exception as e:
-       raise HTTPException(status_code=400, detail=f"Erro ao processar XML: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Erro ao processar XML: {str(e)}")
 
 def extrair_dados_nfe_regex(texto: str) -> dict:
     """Extrai dados da NFe usando regex melhoradas"""
@@ -55,16 +157,27 @@ def extrair_dados_nfe_regex(texto: str) -> dict:
             dados['cnpj_fornecedor'] = cnpj_match.group(1)
             break
     
-    # Fornecedor - buscar por qualquer nome em maiúsculas
+    # Fornecedor - buscar por qualquer nome em maiúsculas (melhorado)
     fornecedor_patterns = [
-        r'([A-Z][A-Z\s\.&\-]{10,})',  # Nome em maiúsculas
-        r'RAZÃO\s+SOCIAL[:\s]*([^\n\r]+)',
+        r'EMITENTE[:\s]*([^\n\r]+)',  # EMITENTE: Nome
+        r'RAZÃO\s+SOCIAL[:\s]*([^\n\r]+)',  # RAZÃO SOCIAL: Nome
+        r'NOME[:\s]*([^\n\r]+)',  # NOME: Nome
+        r'FORNECEDOR[:\s]*([^\n\r]+)',  # FORNECEDOR: Nome
+        r'([A-Z][A-Z\s\.&\-]{15,})',  # Nome em maiúsculas com mais caracteres
+        r'([A-Z][A-Z\s\.&\-]{10,})',  # Nome em maiúsculas (fallback)
     ]
     for pattern in fornecedor_patterns:
         fornecedor_match = re.search(pattern, texto, re.IGNORECASE)
         if fornecedor_match:
             nome = fornecedor_match.group(1).strip()
-            if len(nome) > 10:  # Nome razoável
+            # Filtrar nomes que não são fornecedores
+            if (len(nome) > 10 and 
+                not nome.startswith('NF-') and 
+                not nome.startswith('NOTA') and
+                not nome.startswith('IDENTIFICA') and
+                'CNPJ' not in nome and
+                'CPF' not in nome and
+                'INSCRIÇÃO' not in nome):
                 dados['fornecedor'] = nome
                 break
     
@@ -233,7 +346,7 @@ async def processar_arquivo_universal(file: UploadFile = File(...)):
             return {
                 "success": False,
                 "arquivo": file.filename,
-                "mensagem": f"Erro ao processar PDF: {str(e)}"
+                "message": f"Erro ao processar PDF: {str(e)}"
             }
     
     return {

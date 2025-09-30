@@ -23,6 +23,7 @@ class Nota(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_pinned: Mapped[bool] = mapped_column(Boolean, default=False)
     
     # Relationships
     fornecedor: Mapped["Fornecedor"] = relationship("Fornecedor", back_populates="notas")

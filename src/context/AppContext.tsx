@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { 
   AppContextType, 
   NotaFiscal, 
@@ -80,9 +80,22 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   };
 
   // CRUD Matérias-primas
+  const carregarMateriasPrimas = async (): Promise<void> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/materias-primas/`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data: { items: MateriaPrima[] } = await response.json();
+      setMateriasPrimas(data.items);
+    } catch (error) {
+      console.error("Erro ao carregar matérias-primas:", error);
+    }
+  };
+
   const adicionarMateriaPrima = async (materia: Omit<MateriaPrima, 'id' | 'createdAt' | 'updatedAt'>): Promise<{ success: boolean; message: string }> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/materias-primas`, {
+      const response = await fetch(`${API_BASE_URL}/materias-primas/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -93,6 +106,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data: { success: boolean; message: string } = await response.json();
+      
+      // Recarregar a lista após adicionar
+      if (data.success) {
+        await carregarMateriasPrimas();
+      }
+      
       return data;
     } catch (error) {
       console.error("Erro ao adicionar matéria-prima:", error);
@@ -495,6 +514,11 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       .sort((a, b) => new Date(b.dataCalculo).getTime() - new Date(a.dataCalculo).getTime());
   };
 
+  // Carregar dados iniciais
+  useEffect(() => {
+    carregarMateriasPrimas();
+  }, []);
+
   const value: AppContextType = {
     // Dados
     materiasPrimas: materiasPrimas.filter(m => m.ativo),
@@ -515,6 +539,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     buscarNotaPorChaveAPI,
     
     // Matérias-primas
+    carregarMateriasPrimas,
     adicionarMateriaPrima,
     atualizarMateriaPrima,
     excluirMateriaPrima,
