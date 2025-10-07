@@ -3,14 +3,14 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Copiar package.json e package-lock.json
+# Copiar package.json e package-lock.json da raiz do projeto
 COPY package*.json ./
 
-# Instalar dependÃªncias
+# Instalar dependências
 RUN npm install
 
-# Copiar cÃ³digo
-COPY . .
+# Copiar código da pasta src
+COPY src/ .
 
 # Expor porta
 EXPOSE 5173

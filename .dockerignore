@@ -1,4 +1,5 @@
-﻿node_modules
+﻿# Docker ignore file
+node_modules
 npm-debug.log
 .git
 .gitignore
@@ -6,9 +7,18 @@ README.md
 .env
 .nyc_output
 coverage
-.vscode
-__pycache__
-*.pyc
-.pytest_cache
+.cache
 .DS_Store
-Thumbs.db
+*.log
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+backend/uploads/*
+!backend/uploads/.gitkeep

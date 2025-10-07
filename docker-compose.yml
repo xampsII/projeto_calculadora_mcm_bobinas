@@ -35,7 +35,9 @@ services:
 
   # Frontend React
   frontend:
-    build: ./src
+    build:
+      context: .
+      dockerfile: ./src/Dockerfile
     ports:
       - "5173:5173"
     environment:

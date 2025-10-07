@@ -6,13 +6,13 @@ WORKDIR /app
 # Copiar package.json
 COPY package.json ./
 
-# Instalar dependÃªncias
+# Instalar dependências
 RUN npm install
 
-# Copiar cÃ³digo
+# Copiar código
 COPY . .
 
-# Criar diretÃ³rio para uploads
+# Criar diretório para uploads
 RUN mkdir -p uploads
 
 # Comando para manter o container rodando
