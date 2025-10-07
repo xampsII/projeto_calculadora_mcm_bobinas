@@ -1,108 +1,97 @@
+﻿# -*- coding: utf-8 -*-
 from fastapi import APIRouter, UploadFile, File, HTTPException
 import subprocess
 import json
 import tempfile
 import os
 import re
-import sys
 from typing import Dict, List
-
-# Forçar encoding UTF-8
-if sys.platform.startswith('win'):
-    import codecs
-    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
-    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
+from unidecode import unidecode
 
 router = APIRouter(prefix="/uploads-ia", tags=["uploads-ia"])
 
 async def processar_pdf_com_ia(content: bytes, filename: str) -> dict:
     """Processa PDF usando MCP + IA quando o parser normal falha"""
+    print("\n=== INÃCIO DO PROCESSAMENTO IA ===")
+    print(f"Recebido arquivo: {filename}")
     try:
-        print("=== INÍCIO DO PROCESSAMENTO IA ===")
-        
-        # Salvar arquivo temporário
+        # Salvar arquivo temporÃ¡rio
         with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
             tmp_file.write(content)
             tmp_file_path = tmp_file.name
-        
-        print(f"Arquivo temporário criado: {tmp_file_path}")
+        print(f"Arquivo temporÃ¡rio salvo em: {tmp_file_path}")
         
         try:
-            # Caminho absoluto fixo
-            mcp_path = r"C:\Users\pplima\Downloads\project\mcp-server-pdf\index.js"
-            project_dir = r"C:\Users\pplima\Downloads\project"
+            # Caminho do MCP (dentro do Docker)
+            # No Docker, o backend estÃ¡ em /app, entÃ£o o MCP estÃ¡ em ../mcp-server-pdf
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.abspath(os.path.join(current_dir, '..', '..', '..'))
+            mcp_path = os.path.join(project_root, 'mcp-server-pdf', 'index.js')
             
-            print(f"Caminho MCP: {mcp_path}")
-            print(f"Arquivo MCP existe? {os.path.exists(mcp_path)}")
-            
+            print(f"DEBUG: Current dir: {current_dir}")
+            print(f"DEBUG: Project root: {project_root}")
+            print(f"DEBUG: Caminho MCP: {mcp_path}")
+            print(f"DEBUG: Arquivo existe? {os.path.exists(mcp_path)}")
+
             if not os.path.exists(mcp_path):
-                raise Exception(f"Arquivo MCP não encontrado: {mcp_path}")
-            
+                raise Exception(f"Arquivo MCP nÃ£o encontrado: {mcp_path}")
+
             # Chamar MCP
-            print("Executando MCP...")
-            # Usar subprocess.run com bytes para evitar problemas de encoding
-            result = subprocess.run([
-                'node', 
-                mcp_path, 
-                tmp_file_path
-            ], capture_output=True, cwd=project_dir)
-            
-            # Converter bytes para string de forma segura
-            stdout_bytes = result.stdout
-            stderr_bytes = result.stderr
-            
-            # Decodificar usando UTF-8 com tratamento de erros
+            print(f"Executando MCP: node {mcp_path} {tmp_file_path}")
+            result = subprocess.run(
+                ['node', mcp_path, tmp_file_path],
+                capture_output=True,
+                universal_newlines=False,
+                check=False,
+                cwd=project_root
+            )
+
+            # Decodificar stdout e stderr manualmente
             try:
-                stdout_text = stdout_bytes.decode('utf-8', errors='ignore')
-                stderr_text = stderr_bytes.decode('utf-8', errors='ignore') if stderr_bytes else ""
-            except Exception as e:
-                stdout_text = stdout_bytes.decode('latin-1', errors='ignore')
-                stderr_text = stderr_bytes.decode('latin-1', errors='ignore') if stderr_bytes else ""
-                print(f"Usando latin-1 como fallback: {e}")
-            
-            print(f"Código de retorno: {result.returncode}")
-            print(f"STDOUT length: {len(stdout_text)}")
-            print(f"STDERR: {stderr_text}")
-            
+                stdout_text = result.stdout.decode('utf-8', errors='replace')
+            except UnicodeDecodeError:
+                stdout_text = result.stdout.decode('latin-1', errors='replace')
+
+            try:
+                stderr_text = result.stderr.decode('utf-8', errors='replace')
+            except UnicodeDecodeError:
+                stderr_text = result.stderr.decode('latin-1', errors='replace')
+
+            print(f"CÃ³digo de retorno: {result.returncode}")
+            print(f"Stdout (primeiros 200 chars): {stdout_text[:200]}...")
+            print(f"Stderr: {stderr_text}")
+
             if result.returncode != 0:
-                raise Exception(f"MCP falhou: {result.stderr}")
+                raise Exception(f"Erro no script MCP: {stderr_text}")
             
-            if not stdout_text or stdout_text.strip() == '':
-                raise Exception("MCP não retornou nenhum output")
-            
-            # Parse JSON
-            print("Parseando JSON...")
+            if not stdout_text or stdout_text.strip() == "":
+                raise Exception("MCP nÃ£o retornou nenhum texto.")
+
+            # Parse do resultado JSON do MCP
+            mcp_data = None
             try:
-                # Remover espaços em branco e quebras de linha
-                clean_stdout = stdout_text.strip()
-                print(f"STDOUT limpo (primeiros 200 chars): {clean_stdout[:200]}")
-                mcp_data = json.loads(clean_stdout)
-                print(f"Dados parseados com sucesso!")
+                mcp_data = json.loads(stdout_text)
+                print(f"DEBUG: mcp_data parseado: {mcp_data}")
             except json.JSONDecodeError as e:
-                print(f"Erro ao parsear JSON: {e}")
-                print(f"Raw stdout completo: {stdout_text}")
-                raise Exception(f"Erro ao parsear JSON: {e}")
+                print(f"DEBUG: Erro ao parsear JSON: {e}")
+                print(f"DEBUG: Raw stdout: {stdout_text}")
+                raise Exception(f"Erro ao parsear JSON do MCP: {e}. SaÃ­da: {stdout_text[:200]}")
             
             if mcp_data is None:
-                raise Exception("MCP retornou None")
-            
+                raise Exception("MCP retornou None apÃ³s parse.")
+                
             texto_extraido = mcp_data.get('text', '')
-            # Limpar caracteres especiais que podem causar problemas
-            if texto_extraido:
-                texto_extraido = texto_extraido.encode('utf-8', errors='ignore').decode('utf-8')
-            print(f"Texto extraído: {len(texto_extraido)} caracteres")
-            print(f"Primeiros 100 chars: {texto_extraido[:100]}")
             
-            # Estruturar dados
+            # Limpar texto extraÃ­do para remover caracteres problemÃ¡ticos
+            texto_extraido = unidecode(texto_extraido)
+            texto_extraido = re.sub(r'[^\x00-\x7F]+', '', texto_extraido)
+            texto_extraido = re.sub(r'\s+', ' ', texto_extraido).strip()
+
+            print(f"DEBUG: Texto extraÃ­do (primeiros 100 chars): {texto_extraido[:100]}...")
+            
+            # Usar IA para estruturar os dados
             dados_estruturados = estruturar_dados_com_ia(texto_extraido)
-            print(f"Dados estruturados: {dados_estruturados}")
-            print(f"=== DADOS FINAIS PARA O FRONTEND ===")
-            print(f"Número da Nota: {dados_estruturados.get('numero_nota', 'N/A')}")
-            print(f"Fornecedor: {dados_estruturados.get('fornecedor', 'N/A')}")
-            print(f"CNPJ: {dados_estruturados.get('cnpj_fornecedor', 'N/A')}")
-            print(f"Valor Total: {dados_estruturados.get('valor_total', 'N/A')}")
-            print(f"Data: {dados_estruturados.get('data_emissao', 'N/A')}")
-            print(f"=== FIM DOS DADOS ===")
+            print(f"DEBUG: Dados estruturados: {dados_estruturados}")
             
             resultado_final = {
                 "success": True,
@@ -110,23 +99,17 @@ async def processar_pdf_com_ia(content: bytes, filename: str) -> dict:
                 "dados_extraidos": dados_estruturados,
                 "message": f"PDF processado com IA! {len(dados_estruturados.get('itens', []))} itens encontrados."
             }
-            
-            print(f"=== RESULTADO FINAL PARA O FRONTEND ===")
-            print(f"Success: {resultado_final['success']}")
-            print(f"Message: {resultado_final['message']}")
-            print(f"Dados extraídos: {resultado_final['dados_extraidos']}")
-            print(f"=== FIM RESULTADO ===")
-            
+            print(f"DEBUG: Retorno final do backend: {resultado_final}")
             return resultado_final
             
         finally:
-            # Limpar arquivo temporário
+            # Limpar arquivo temporÃ¡rio
             if os.path.exists(tmp_file_path):
                 os.unlink(tmp_file_path)
-                print(f"Arquivo temporário removido: {tmp_file_path}")
+            print(f"Arquivo temporÃ¡rio removido: {tmp_file_path}")
             
     except Exception as e:
-        print(f"ERRO GERAL: {str(e)}")
+        print(f"ERROR: Erro completo no processamento IA: {str(e)}")
         return {
             "success": False,
             "method": "ai_fallback",
@@ -135,13 +118,14 @@ async def processar_pdf_com_ia(content: bytes, filename: str) -> dict:
 
 def estruturar_dados_com_ia(texto: str) -> dict:
     """Extrai dados usando regex inteligente"""
+    print(f"DEBUG: Estruturando dados com IA (regex) do texto: {texto[:100]}...")
     
     dados = {
         "numero_nota": "000000",
         "serie": "1",
         "chave_acesso": "",
         "valor_total": 0.0,
-        "fornecedor": "Fornecedor não identificado",
+        "fornecedor": "Fornecedor nÃ£o identificado",
         "cnpj_fornecedor": "00000000000000",
         "data_emissao": "",
         "endereco": "",
@@ -162,7 +146,7 @@ def estruturar_dados_com_ia(texto: str) -> dict:
         except:
             pass
     
-    # Número da nota
+    # NÃºmero da nota
     numero_match = re.search(r'Nota.*?(\d+)', texto, re.IGNORECASE)
     if numero_match:
         dados["numero_nota"] = numero_match.group(1)
@@ -172,16 +156,19 @@ def estruturar_dados_com_ia(texto: str) -> dict:
     if data_match:
         dados["data_emissao"] = data_match.group(1)
     
+    print(f"DEBUG: Dados extraÃ­dos por regex: {dados}")
     return dados
 
 @router.post("/processar-pdf")
 async def processar_pdf_com_ia_endpoint(file: UploadFile = File(...)):
     """Endpoint para processar PDF com IA"""
+    print(f"Recebida requisiÃ§Ã£o para /uploads-ia/processar-pdf para {file.filename}")
     
     if not file.filename or not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Apenas arquivos PDF são aceitos")
+        raise HTTPException(status_code=400, detail="Apenas arquivos PDF sÃ£o aceitos")
     
     content = await file.read()
     resultado = await processar_pdf_com_ia(content, file.filename)
     
+    print(f"DEBUG: Retornando resultado do endpoint: {resultado['success']}")
     return resultado
