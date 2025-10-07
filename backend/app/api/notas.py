@@ -329,6 +329,10 @@ async def create_nota(
         
     except Exception as e:
         print(f"ERROR: Erro ao criar nota: {str(e)}")
+        print(f"ERROR: Tipo de erro: {type(e).__name__}")
+        import traceback
+        print(f"ERROR: Traceback completo:")
+        traceback.print_exc()
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
