@@ -9,8 +9,18 @@ COPY package*.json ./
 # Instalar dependências
 RUN npm install
 
+# Copiar arquivos de configuração da raiz
+COPY vite.config.ts ./
+COPY tsconfig.json ./
+COPY tsconfig.app.json ./
+COPY tsconfig.node.json ./
+COPY index.html ./
+COPY postcss.config.js ./
+COPY tailwind.config.js ./
+COPY eslint.config.js ./
+
 # Copiar código da pasta src
-COPY src/ .
+COPY src/ ./src/
 
 # Expor porta
 EXPOSE 5173
