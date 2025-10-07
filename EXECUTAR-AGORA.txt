@@ -1,0 +1,40 @@
+=====================================
+  EXECUTE ESTE COMANDO AGORA
+=====================================
+
+No terminal do VSCode, digite:
+
+.\corrigir-banco.ps1
+
+E aperte Enter!
+
+=====================================
+
+OU execute manualmente:
+
+docker-compose down
+docker-compose up -d
+Start-Sleep -Seconds 15
+docker exec -it projeto_calculadora_mcm_bobinas-backend-1 alembic upgrade head
+docker exec -it projeto_calculadora_mcm_bobinas-backend-1 python -m app.seeds  
+docker-compose restart backend
+
+=====================================
+
+O QUE FOI CORRIGIDO:
+
+1. Tabela "fornecedores" renomeada para "fornecedor"
+2. Adicionadas colunas "is_active" e "is_pinned" em "notas"
+3. Campo "numero" alterado para VARCHAR
+4. Adicionada coluna "menor_unidade_id" em "unidades"
+5. Criada tabela "produtos_finais"
+
+=====================================
+
+Depois de executar, acesse:
+http://localhost:5173
+
+E teste salvar a nota fiscal!
+
+=====================================
+
