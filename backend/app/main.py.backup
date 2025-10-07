@@ -1,4 +1,4 @@
-﻿from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
@@ -19,7 +19,7 @@ from app.api.notas import router as notas_router
 from app.api.unidades import router as unidades_router
 from app.api.materias_primas import router as materias_primas_router
 
-# ConfiguraÃ§Ã£o de logging
+# Configuração de logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -34,35 +34,31 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifecycle da aplicaÃ§Ã£o"""
+    """Lifecycle da aplicação"""
     # Startup
-    logger.info("Iniciando aplicaÃ§Ã£o NFE...")
+    logger.info("Iniciando aplicação NFE...")
     
-    # NOTA: Tabelas devem ser criadas via Alembic migrations
-    # Execute: alembic upgrade head
-    # NÃ£o usar Base.metadata.create_all() pois nÃ£o cria ENUMs do PostgreSQL
-    
-    # Verificar conexÃ£o com banco
+    # Criar tabelas se não existirem (código síncrono)
     try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        logger.info("ConexÃ£o com banco de dados estabelecida com sucesso")
+        from app.models.base import Base
+        Base.metadata.create_all(bind=engine)
+        logger.info("Banco de dados inicializado com sucesso")
     except Exception as e:
-        logger.error(f"Erro ao conectar com banco de dados: {e}")
+        logger.error(f"Erro ao inicializar banco de dados: {e}")
         raise
     
     yield
     
     # Shutdown
-    logger.info("Encerrando aplicaÃ§Ã£o NFE...")
+    logger.info("Encerrando aplicação NFE...")
 
 
-# CriaÃ§Ã£o da aplicaÃ§Ã£o FastAPI
+# Criação da aplicação FastAPI
 DEBUG = getattr(settings, "DEBUG", True)
 
 app = FastAPI(
-    title="Sistema NFE - Notas Fiscais EletrÃ´nicas",
-    description="Sistema completo para gestÃ£o de notas fiscais eletrÃ´nicas, matÃ©rias-primas, fornecedores e produtos",
+    title="Sistema NFE - Notas Fiscais Eletrônicas",
+    description="Sistema completo para gestão de notas fiscais eletrônicas, matérias-primas, fornecedores e produtos",
     version="1.0.0",
     debug=DEBUG,
     docs_url="/docs" if DEBUG else None,
@@ -72,7 +68,7 @@ app = FastAPI(
 )
 
 # Middleware CORS
-# ConfiguraÃ§Ã£o explÃ­cita para desenvolvimento
+# Configuração explícita para desenvolvimento
 cors_origins = [
     "http://localhost:5173",
     "http://localhost:5174",
@@ -95,14 +91,14 @@ app.add_middleware(
 
 
 
-# Middleware de hosts confiÃ¡veis
+# Middleware de hosts confiáveis
 app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=settings.ALLOWED_HOSTS
 )
 
 
-# Middleware de logging de requisiÃ§Ãµes
+# Middleware de logging de requisições
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start_time = time.time()
@@ -139,12 +135,12 @@ async def log_requests(request: Request, call_next):
 # Exception handlers
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """Handler para erros de validaÃ§Ã£o de requisiÃ§Ã£o"""
+    """Handler para erros de validação de requisição"""
     logger.warning(f"Validation error: {exc.errors()}")
     return JSONResponse(
         status_code=422,
         content={
-            "detail": "Erro de validaÃ§Ã£o",
+            "detail": "Erro de validação",
             "errors": exc.errors(),
             "path": request.url.path
         }
@@ -153,7 +149,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-    """Handler para exceÃ§Ãµes HTTP"""
+    """Handler para exceções HTTP"""
     logger.warning(f"HTTP error {exc.status_code}: {exc.detail}")
     return JSONResponse(
         status_code=exc.status_code,
@@ -166,7 +162,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
-    """Handler para exceÃ§Ãµes gerais"""
+    """Handler para exceções gerais"""
     logger.error(f"Unexpected error: {str(exc)}", exc_info=True)
     
     # Log detalhado para erros de SQLAlchemy
@@ -194,8 +190,8 @@ async def general_exception_handler(request: Request, exc: Exception):
 # Health check
 @app.get("/health")
 async def health_check():
-    """Endpoint de verificaÃ§Ã£o de saÃºde da aplicaÃ§Ã£o"""
-    # Verificar conexÃ£o com banco
+    """Endpoint de verificação de saúde da aplicação"""
+    # Verificar conexão com banco
     db_status = False
     try:
         from app.database import engine
@@ -235,16 +231,16 @@ async def test_notas():
 # Root endpoint
 @app.get("/")
 async def root():
-    """Endpoint raiz da aplicaÃ§Ã£o"""
+    """Endpoint raiz da aplicação"""
     return {
-        "message": "Sistema NFE - API de Notas Fiscais EletrÃ´nicas",
+        "message": "Sistema NFE - API de Notas Fiscais Eletrônicas",
         "version": "1.0.0",
         "docs": "/docs",
         "health": "/health"
     }
 
 
-# inclui todos os routers disponÃ­veis
+# inclui todos os routers disponíveis
 app.include_router(notas_router)
 app.include_router(integracoes_router)
 app.include_router(usuarios_router)
