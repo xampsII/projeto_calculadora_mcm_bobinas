@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Save, Upload, Loader2, Plus, Trash2, Download } from 'lucide-react';
+import { Save, Upload, Loader2, Plus, Trash2, Download, Bot } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { NotaFiscal, NotaFiscalItem } from '../types';
 import { formatCNPJ, validateCNPJ, formatCurrency } from '../utils/formatters';
 import Breadcrumb from './ui/Breadcrumb';
 import NotificationToast from './NotificationToast';
+import IAAssistant from './IAAssistant';
 
 interface NotaFiscalFormProps {
   notaId?: string;
@@ -14,27 +15,18 @@ interface NotaFiscalFormProps {
 
 const UNIDADES_OPCOES = [
   { value: 'KG', label: 'Quilo (KG)' },
+  { value: 'G', label: 'Grama (G)' },
+  { value: 'L', label: 'Litro (L)' },
+  { value: 'ML', label: 'Mililitro (ML)' },
+  { value: 'M', label: 'Metro (M)' },
+  { value: 'CM', label: 'Centímetro (CM)' },
   { value: 'UN', label: 'Unidade (UN)' },
-  { value: 'MT', label: 'Metro (MT)' },
+  { value: 'CX', label: 'Caixa (CX)' },
   { value: 'PC', label: 'Peça (PC)' },
-  { value: 'RL', label: 'Rolo (RL)' },
-  { value: 'JG', label: 'Jogo (JG)' },
-  { value: 'g', label: 'Grama (g)' },
-  { value: 'mm', label: 'Milímetro (mm)' },
-  { value: 'cm', label: 'Centímetro (cm)' },
-  { value: 'bobina', label: 'Bobina' },
-  { value: 'folha', label: 'Folha' },
-  { value: 'pacote', label: 'Pacote' },
-  { value: 'caixa', label: 'Caixa' },
-  { value: 'l', label: 'Litro (l)' },
-  { value: 'ml', label: 'Mililitro (ml)' },
-  { value: 'saco', label: 'Saco' },
-  { value: 'tubo', label: 'Tubo' },
-  { value: 'barra', label: 'Barra' },
-  { value: 'lata', label: 'Lata' },
-  { value: 'galão', label: 'Galão' },
-  { value: 'm²', label: 'Metro quadrado (m²)' },
-  { value: 'm³', label: 'Metro cúbico (m³)' },
+  { value: 'ROLO', label: 'Rolo (ROLO)' },
+  { value: 'BOBINA', label: 'Bobina (BOBINA)' },
+  { value: 'FARDO', label: 'Fardo (FARDO)' },
+  { value: 'PACOTE', label: 'Pacote (PACOTE)' },
   { value: 'outro', label: 'Outra...' },
 ];
 
@@ -49,8 +41,13 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
   const [activeMode, setActiveMode] = useState<'import'>('import');
   const [loading, setLoading] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
+  const [isProcessingIA, setIsProcessingIA] = useState(false);
+  const [uploadMethod, setUploadMethod] = useState<'normal' | 'ia' | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [customUnidades, setCustomUnidades] = useState<{[key: number]: string}>({});
+  const [showIA, setShowIA] = useState(false);
+  const [fileForIA, setFileForIA] = useState<File | null>(null);
 
   const [formData, setFormData] = useState({
     numeroNota: '',
@@ -307,8 +304,11 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
           type: 'success',
         });
       } else {
+        // Se falhou, mostrar opção de IA
+        setFileForIA(file);
+        setShowIA(true);
         setNotification({
-          message: result.message,
+          message: 'Upload falhou. Use o assistente IA para extrair os dados.',
           type: 'error',
         });
       }
@@ -319,6 +319,178 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
       });
     } finally {
       setImportLoading(false);
+    }
+  };
+
+  const handleIASuccess = (data: any) => {
+    console.log('=== HANDLE IA SUCCESS ===');
+    console.log('Dados recebidos:', data);
+    console.log('=== FIM HANDLE IA SUCCESS ===');
+    
+    setFormData(prev => {
+      const novosItens = data.itens ? data.itens.map((item: any, index: number) => ({
+        id: `ai-${index}`,
+        materiaPrimaNome: item.descricao || item.materia_prima || '',
+        unidadeMedida: item.unidade || item.un || '',
+        menorUnidadeUso: item.unidade || item.un || '',
+        quantidade: item.quantidade || 0,
+        valorUnitario: Number((item.valor_unitario || item.valorUnitario || 0).toFixed(2)),
+        valorTotal: Number((item.valor_total || item.valorTotal || 0).toFixed(2)),
+      })) : prev.itens;
+
+      return {
+        ...prev,
+        numeroNota: data.numero_nota || prev.numeroNota,
+        fornecedorNome: data.fornecedor || prev.fornecedorNome,
+        cnpjFornecedor: data.cnpj_fornecedor || prev.cnpjFornecedor,
+        enderecoFornecedor: data.endereco || prev.enderecoFornecedor,
+        dataEmissao: data.data_emissao || prev.dataEmissao,
+        valorTotal: data.valor_total || prev.valorTotal,
+        itens: novosItens,
+      };
+    });
+    
+    console.log('=== FORM DATA ATUALIZADO ===');
+    console.log('Novos dados aplicados ao formulário');
+    console.log('=== FIM FORM DATA ===');
+    
+    setShowIA(false);
+    setFileForIA(null);
+  };
+
+  const handleUploadWithIA = async () => {
+    if (!selectedFile) return;
+
+    setIsProcessingIA(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      
+      const response = await fetch('http://127.0.0.1:8000/uploads-ia/processar-pdf', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const result = await response.json();
+      
+      if (result.success && result.dados_extraidos) {
+        // Preencher os campos com os dados extraídos pela IA
+        setFormData(prev => {
+          const novosItens = result.dados_extraidos.itens ? result.dados_extraidos.itens.map((item: any, index: number) => ({
+            id: `ai-${index}`,
+            materiaPrimaNome: item.descricao || item.materia_prima || '',
+            unidadeMedida: item.unidade || item.un || '',
+            menorUnidadeUso: item.unidade || item.un || '',
+            quantidade: item.quantidade || 0,
+            valorUnitario: Number((item.valor_unitario || item.valorUnitario || 0).toFixed(2)),
+            valorTotal: Number((item.valor_total || item.valorTotal || 0).toFixed(2)),
+          })) : prev.itens;
+
+          return {
+            ...prev,
+            numeroNota: result.dados_extraidos.numero_nota || prev.numeroNota,
+            fornecedorNome: result.dados_extraidos.fornecedor || prev.fornecedorNome,
+            cnpjFornecedor: result.dados_extraidos.cnpj_fornecedor || prev.cnpjFornecedor,
+            enderecoFornecedor: result.dados_extraidos.endereco || prev.enderecoFornecedor,
+            dataEmissao: result.dados_extraidos.data_emissao || prev.dataEmissao,
+            valorTotal: result.dados_extraidos.valor_total || prev.valorTotal,
+            itens: novosItens,
+          };
+        });
+        
+        setNotification({
+          message: 'PDF processado com IA! Revise os dados extraídos.',
+          type: 'success',
+        });
+        setUploadMethod(null);
+        setSelectedFile(null);
+      } else {
+        setNotification({
+          message: `Erro ao processar com IA: ${result.message}`,
+          type: 'error',
+        });
+      }
+    } catch (error) {
+      setNotification({
+        message: 'Erro ao conectar com o servidor IA',
+        type: 'error',
+      });
+    } finally {
+      setIsProcessingIA(false);
+    }
+  };
+
+  const resetUploadMethod = () => {
+    setUploadMethod(null);
+    setSelectedFile(null);
+  };
+
+  const handleFileUploadWithIA = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      setNotification({
+        message: 'Para usar IA, selecione apenas arquivos PDF.',
+        type: 'error',
+      });
+      return;
+    }
+
+    setIsProcessingIA(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch('http://127.0.0.1:8000/uploads-ia/processar-pdf', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const result = await response.json();
+      
+      if (result.success && result.dados_extraidos) {
+        // Preencher os campos com os dados extraídos pela IA
+        setFormData(prev => {
+          const novosItens = result.dados_extraidos.itens ? result.dados_extraidos.itens.map((item: any, index: number) => ({
+            id: `ai-${index}`,
+            materiaPrimaNome: item.descricao || item.materia_prima || '',
+            unidadeMedida: item.unidade || item.un || '',
+            menorUnidadeUso: item.unidade || item.un || '',
+            quantidade: item.quantidade || 0,
+            valorUnitario: Number((item.valor_unitario || item.valorUnitario || 0).toFixed(2)),
+            valorTotal: Number((item.valor_total || item.valorTotal || 0).toFixed(2)),
+          })) : prev.itens;
+
+          return {
+            ...prev,
+            numeroNota: result.dados_extraidos.numero_nota || prev.numeroNota,
+            fornecedorNome: result.dados_extraidos.fornecedor || prev.fornecedorNome,
+            cnpjFornecedor: result.dados_extraidos.cnpj_fornecedor || prev.cnpjFornecedor,
+            enderecoFornecedor: result.dados_extraidos.endereco || prev.enderecoFornecedor,
+            dataEmissao: result.dados_extraidos.data_emissao || prev.dataEmissao,
+            valorTotal: result.dados_extraidos.valor_total || prev.valorTotal,
+            itens: novosItens,
+          };
+        });
+        
+        setNotification({
+          message: 'PDF processado com IA! Revise os dados extraídos.',
+          type: 'success',
+        });
+      } else {
+        setNotification({
+          message: `Erro ao processar com IA: ${result.message}`,
+          type: 'error',
+        });
+      }
+    } catch (error) {
+      setNotification({
+        message: 'Erro ao conectar com o servidor IA',
+        type: 'error',
+      });
+    } finally {
+      setIsProcessingIA(false);
     }
   };
 
@@ -341,8 +513,6 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
         ]}
       />
 
-      {/* Steps */}
-
       {/* Mode Toggle - Apenas Importar Arquivo */}
       <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
         <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg w-fit">
@@ -361,52 +531,109 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
             </div>
           </button>
         </div>
-      </div>
 
-      {/* Import Section */}
-      {activeMode === 'import' && (
-        <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            Importar Nota Fiscal
-          </h3>
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
-            <div className="text-center">
-              {importLoading ? (
-                <div className="space-y-4">
-                  <Loader2 className="mx-auto h-12 w-12 text-red-500 animate-spin" />
-                  <p className="text-sm text-gray-600">Processando arquivo...</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <Upload className="mx-auto h-12 w-12 text-gray-500" />
-                  <div>
-                    <label htmlFor="file-upload" className="cursor-pointer">
-                      <span className="text-red-500 font-medium hover:text-red-400">
-                        Selecione um arquivo
-                      </span>
-                      <span className="text-gray-300"> ou arraste e solte</span>
-                    </label>
-                    <input
-                      id="file-upload"
-                      name="file-upload"
-                      type="file"
-                      className="sr-only"
-                      accept=".csv,.xlsx,.xls,.xml,.pdf"
-                      onChange={handleFileUpload}
-                      disabled={importLoading}
-                    />
-                  </div>
-                  <p className="text-xs text-gray-400">
-                    Arquivos suportados: CSV, XLSX, XLS, XML, PDF (máx. 10MB)
-                  </p>
-                </div>
-              )}
+        {activeMode === 'import' && (
+          <div className="mt-6 space-y-4">
+            {/* Upload de arquivo */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Upload Normal */}
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-red-400 transition-colors">
+                <input
+                  type="file"
+                  id="file-upload"
+                  onChange={handleFileUpload}
+                  accept=".csv,.xlsx,.xls,.xml,.pdf"
+                  className="hidden"
+                  disabled={importLoading}
+                />
+                <label
+                  htmlFor="file-upload"
+                  className="cursor-pointer flex flex-col items-center space-y-2"
+                >
+                  {importLoading ? (
+                    <Loader2 className="h-8 w-8 text-red-600 animate-spin" />
+                  ) : (
+                    <Upload className="h-8 w-8 text-gray-400" />
+                  )}
+                  <span className="text-sm font-medium text-gray-700">
+                    {importLoading ? 'Processando...' : 'Upload Normal'}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    CSV, XLSX, XLS, XML, PDF
+                  </span>
+                </label>
+              </div>
+
+              {/* Upload com IA */}
+              <div className="border-2 border-dashed border-blue-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors bg-blue-50">
+                <input
+                  type="file"
+                  id="file-upload-ia"
+                  onChange={handleFileUploadWithIA}
+                  accept=".pdf"
+                  className="hidden"
+                  disabled={isProcessingIA}
+                />
+                <label
+                  htmlFor="file-upload-ia"
+                  className="cursor-pointer flex flex-col items-center space-y-2"
+                >
+                  {isProcessingIA ? (
+                    <Loader2 className="h-8 w-8 text-blue-600 animate-spin" />
+                  ) : (
+                    <Bot className="h-8 w-8 text-blue-500" />
+                  )}
+                  <span className="text-sm font-medium text-blue-700">
+                    {isProcessingIA ? 'Processando com IA...' : '🤖 Upload com IA'}
+                  </span>
+                  <span className="text-xs text-blue-600">
+                    PDFs complexos ou que falharam
+                  </span>
+                </label>
+              </div>
             </div>
-          </div>
-          
-        </div>
-      )}
 
+            {/* Botão IA quando upload normal falha */}
+            {uploadMethod === 'normal' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-medium text-blue-900">Upload falhou</h3>
+                    <p className="text-sm text-blue-700 mt-1">
+                      Tente usar IA para extrair dados de PDFs complexos
+                    </p>
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={handleUploadWithIA}
+                      disabled={isProcessingIA}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                    >
+                      {isProcessingIA ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>Processando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Bot className="h-4 w-4" />
+                          <span>🤖 Tentar com IA</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={resetUploadMethod}
+                      className="bg-gray-300 hover:bg-gray-400 text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Form Section */}
       <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
@@ -745,6 +972,16 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
           </div>
         </form>
       </div>
+      {showIA && fileForIA && (
+        <IAAssistant
+          file={fileForIA}
+          onSuccess={handleIASuccess}
+          onClose={() => {
+            setShowIA(false);
+            setFileForIA(null);
+          }}
+        />
+      )}
     </div>
   );
 };

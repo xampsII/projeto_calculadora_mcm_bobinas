@@ -14,6 +14,7 @@ from app.database import engine
 from app.models import load_all_models
 from app.api import integracoes_router, usuarios_router, fornecedores_router, produtos_router, produtos_finais_router
 from app.api.uploads import router as uploads_router
+from app.api.uploads_ia import router as uploads_ia_router
 from app.api.notas import router as notas_router
 from app.api.unidades import router as unidades_router
 from app.api.materias_primas import router as materias_primas_router
@@ -247,6 +248,7 @@ app.include_router(fornecedores_router)
 app.include_router(produtos_router)
 app.include_router(produtos_finais_router)
 app.include_router(uploads_router)
+app.include_router(uploads_ia_router)
 app.include_router(unidades_router)
 app.include_router(materias_primas_router)
 
