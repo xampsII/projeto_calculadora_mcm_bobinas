@@ -49,76 +49,84 @@ async def criar_produto_final(
 async def listar_materias_primas_disponiveis(
     db: Session = Depends(get_db)
 ):
-    """Lista matÃ©rias-primas disponÃ­veis para uso em produtos"""
+    """Lista matérias-primas disponíveis para uso em produtos"""
     try:
-        print("DEBUG: Iniciando busca de matÃ©rias-primas disponÃ­veis")
+        print("DEBUG: Iniciando busca de matérias-primas disponíveis")
         
-        # Buscar todas as matÃ©rias-primas ativas
-        materias_primas = db.query(MateriaPrima).filter(MateriaPrima.is_active == True).all()
-        print(f"DEBUG: Encontradas {len(materias_primas)} matÃ©rias-primas ativas")
+        # Verificar se a tabela existe primeiro
+        try:
+            materias_primas = db.query(MateriaPrima).filter(MateriaPrima.is_active == True).all()
+            print(f"DEBUG: Encontradas {len(materias_primas)} matérias-primas ativas")
+        except Exception as e:
+            print(f"DEBUG: Erro ao buscar matérias-primas: {e}")
+            # Retornar lista vazia se tabela não existir
+            return []
         
         materias_formatadas = []
         
         for mp in materias_primas:
-            print(f"DEBUG: Processando matÃ©ria-prima: {mp.nome}")
-            
-            # Buscar preÃ§o atual usando ORM (sem SQL raw)
-            preco_atual = 0.0
             try:
-                preco_obj = db.query(MateriaPrimaPreco).filter(
-                    MateriaPrimaPreco.materia_prima_id == mp.id,
-                    MateriaPrimaPreco.vigente_ate.is_(None)  # PreÃ§o atual
-                ).order_by(MateriaPrimaPreco.vigente_desde.desc()).first()
+                print(f"DEBUG: Processando matéria-prima: {mp.nome}")
                 
-                if preco_obj:
-                    preco_atual = float(preco_obj.valor_unitario)
-                    print(f"DEBUG: PreÃ§o encontrado: R$ {preco_atual}")
-                else:
-                    print(f"DEBUG: Nenhum preÃ§o encontrado para {mp.nome}")
-            except Exception as e:
-                print(f"DEBUG: Erro ao buscar preÃ§o: {e}")
+                # Buscar preço atual usando ORM (sem SQL raw)
                 preco_atual = 0.0
-            
-            # Extrair quantidade do nome se existir
-            quantidade_original = 1
-            nome_limpo = mp.nome
-            unidade_original = mp.unidade_codigo or "un"
-            
-            # Procurar por padrÃµes como "18L", "5KG", "10PC", etc.
-            import re
-            match = re.search(r'(\d+(?:\.\d+)?)\s*(L|KG|PC|UN|MT|M)$', mp.nome.upper())
-            if match:
-                quantidade_original = float(match.group(1))
-                unidade_original = match.group(2)
-                # Remover quantidade do nome
-                nome_limpo = re.sub(r'\s*\d+(?:\.\d+)?\s*(L|KG|PC|UN|MT|M)$', '', mp.nome).strip()
-            
-            # Converter preÃ§o para unidade base
-            if quantidade_original and quantidade_original > 0:
-                preco_por_unidade = preco_atual / quantidade_original
-            else:
-                preco_por_unidade = preco_atual
-            
-            materias_formatadas.append({
-                "id": mp.id,
-                "nome": nome_limpo,
-                "unidade": unidade_original,
-                "valorUnitario": preco_por_unidade
-            })
+                try:
+                    preco_obj = db.query(MateriaPrimaPreco).filter(
+                        MateriaPrimaPreco.materia_prima_id == mp.id,
+                        MateriaPrimaPreco.vigente_ate.is_(None)  # Preço atual
+                    ).order_by(MateriaPrimaPreco.vigente_desde.desc()).first()
+                    
+                    if preco_obj:
+                        preco_atual = float(preco_obj.valor_unitario)
+                        print(f"DEBUG: Preço encontrado: R$ {preco_atual}")
+                    else:
+                        print(f"DEBUG: Nenhum preço encontrado para {mp.nome}")
+                except Exception as e:
+                    print(f"DEBUG: Erro ao buscar preço: {e}")
+                    preco_atual = 0.0
+                
+                # Extrair quantidade do nome se existir
+                quantidade_original = 1
+                nome_limpo = mp.nome
+                unidade_original = mp.unidade_codigo or "un"
+                
+                # Procurar por padrões como "18L", "5KG", "10PC", etc.
+                import re
+                match = re.search(r'(\d+(?:\.\d+)?)\s*(L|KG|PC|UN|MT|M)$', mp.nome.upper())
+                if match:
+                    quantidade_original = float(match.group(1))
+                    unidade_original = match.group(2)
+                    # Remover quantidade do nome
+                    nome_limpo = re.sub(r'\s*\d+(?:\.\d+)?\s*(L|KG|PC|UN|MT|M)$', '', mp.nome).strip()
+                
+                # Converter preço para unidade base
+                if quantidade_original and quantidade_original > 0:
+                    preco_por_unidade = preco_atual / quantidade_original
+                else:
+                    preco_por_unidade = preco_atual
+                
+                materias_formatadas.append({
+                    "id": mp.id,
+                    "nome": nome_limpo,
+                    "unidade": unidade_original,
+                    "valorUnitario": preco_por_unidade
+                })
+                
+            except Exception as e:
+                print(f"DEBUG: Erro ao processar matéria-prima {mp.nome}: {e}")
+                continue
         
         # Ordenar por nome
         materias_formatadas.sort(key=lambda x: x['nome'])
-        print(f"DEBUG: Retornando {len(materias_formatadas)} matÃ©rias-primas formatadas")
+        print(f"DEBUG: Retornando {len(materias_formatadas)} matérias-primas formatadas")
         
         return materias_formatadas
         
     except Exception as e:
-        print(f"ERROR: Erro ao listar matÃ©rias-primas: {str(e)}")
-        logger.error(f"Erro ao listar matÃ©rias-primas: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao listar matÃ©rias-primas: {str(e)}"
-        )
+        print(f"ERROR: Erro ao listar matérias-primas: {str(e)}")
+        logger.error(f"Erro ao listar matérias-primas: {str(e)}")
+        # Retornar lista vazia em caso de erro
+        return []
 
 @produtos_finais_router.get("/")
 async def listar_produtos_finais(
@@ -131,35 +139,42 @@ async def listar_produtos_finais(
     try:
         print("DEBUG: Listando produtos finais")
         
-        query = db.query(ProdutoFinal)
-        if ativo is not None:
-            query = query.filter(ProdutoFinal.ativo == ativo)
-        
-        produtos = query.offset(skip).limit(limit).all()
-        print(f"DEBUG: Encontrados {len(produtos)} produtos finais")
+        # Verificar se a tabela existe primeiro
+        try:
+            query = db.query(ProdutoFinal)
+            if ativo is not None:
+                query = query.filter(ProdutoFinal.ativo == ativo)
+            
+            produtos = query.offset(skip).limit(limit).all()
+            print(f"DEBUG: Encontrados {len(produtos)} produtos finais")
+        except Exception as e:
+            print(f"DEBUG: Erro ao buscar produtos finais: {e}")
+            return []
         
         # Converter para formato simples
         produtos_formatados = []
         for produto in produtos:
-            produtos_formatados.append({
-                "id": produto.id,
-                "nome": produto.nome,
-                "descricao": produto.descricao,
-                "componentes": produto.componentes,
-                "ativo": produto.ativo,
-                "created_at": produto.created_at.isoformat() if produto.created_at else None,
-                "updated_at": produto.updated_at.isoformat() if produto.updated_at else None
-            })
+            try:
+                produtos_formatados.append({
+                    "id": produto.id,
+                    "nome": produto.nome,
+                    "descricao": produto.descricao,
+                    "componentes": produto.componentes,
+                    "ativo": produto.ativo,
+                    "created_at": produto.created_at.isoformat() if produto.created_at else None,
+                    "updated_at": produto.updated_at.isoformat() if produto.updated_at else None
+                })
+            except Exception as e:
+                print(f"DEBUG: Erro ao formatar produto {produto.id}: {e}")
+                continue
         
         return produtos_formatados
         
     except Exception as e:
         print(f"ERROR: Erro ao listar produtos finais: {str(e)}")
         logger.error(f"Erro ao listar produtos finais: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao listar produtos finais: {str(e)}"
-        )
+        # Retornar lista vazia em caso de erro
+        return []
 
 @produtos_finais_router.get("/{produto_id}")
 async def obter_produto_final(
@@ -173,7 +188,7 @@ async def obter_produto_final(
         if not produto:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Produto final nÃ£o encontrado"
+                detail="Produto final não encontrado"
             )
         
         return {
@@ -208,7 +223,7 @@ async def atualizar_produto_final(
         if not produto_existente:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Produto final nÃ£o encontrado"
+                detail="Produto final não encontrado"
             )
         
         # Atualizar campos
@@ -246,7 +261,7 @@ async def deletar_produto_final(
         if not produto:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Produto final nÃ£o encontrado"
+                detail="Produto final não encontrado"
             )
         
         # Soft delete
