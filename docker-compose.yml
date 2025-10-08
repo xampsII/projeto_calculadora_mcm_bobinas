@@ -1,19 +1,17 @@
-﻿version: '3.8'
-
-services:
+﻿services:
   # Banco de dados PostgreSQL
   db:
     image: postgres:15
     environment:
-      POSTGRES_DB: mcm_bobinas
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres123
+      POSTGRES_DB: nfedb
+      POSTGRES_USER: nfeuser
+      POSTGRES_PASSWORD: nfepass
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U nfeuser"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -24,7 +22,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres123@db:5432/mcm_bobinas
+      - DATABASE_URL=postgresql://nfeuser:nfepass@db:5432/nfedb
       - SECRET_KEY=sua_chave_secreta_aqui_123456
       - DEBUG=True
       - CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173

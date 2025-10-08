@@ -1,0 +1,39 @@
+========================================
+  SISTEMA DE NOTAS FISCAIS - INICIAR
+========================================
+
+CORRIGIDO: Problema de configuracao do banco de dados
+
+PARA INICIAR O SISTEMA:
+------------------------
+
+OPCAO 1 (SIMPLES):
+   Execute o arquivo: INICIAR-SISTEMA.bat
+   
+OPCAO 2 (MANUAL):
+   1. docker-compose down -v
+   2. docker-compose up -d
+   3. Aguardar 30 segundos
+   4. docker-compose exec backend alembic upgrade head
+   5. docker-compose exec backend python -m app.seeds
+
+ACESSAR:
+--------
+   Interface: http://localhost:5173
+   API/Docs:  http://localhost:8000/docs
+
+COMANDOS UTEIS:
+---------------
+   Ver status:  docker-compose ps
+   Ver logs:    docker-compose logs -f
+   Parar tudo:  docker-compose down
+
+TEMPO TOTAL: ~2-3 minutos
+
+========================================
+
+IMPORTANTE: As credenciais do banco foram corrigidas
+no docker-compose.yml. Nao precisa criar arquivo .env.
+
+========================================
+
