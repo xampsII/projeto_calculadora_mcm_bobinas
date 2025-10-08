@@ -89,32 +89,33 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_audit_logs_id'), 'audit_logs', ['id'], unique=False)
     
-    # Create unidades table
+    # Create unidades table (CORRIGIDO: menor_unidade_id)
     op.create_table('unidades',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('codigo', sa.String(length=10), nullable=False),
         sa.Column('descricao', sa.String(), nullable=False),
         sa.Column('fator_para_menor', sa.Numeric(precision=10, scale=4), nullable=True),
-        sa.Column('menor_unidade_codigo', sa.String(length=10), nullable=True),
+        sa.Column('menor_unidade_id', sa.Integer(), nullable=True),
         sa.Column('is_base', sa.Boolean(), nullable=False),
-        sa.PrimaryKeyConstraint('id')
+        sa.PrimaryKeyConstraint('id'),
+        sa.ForeignKeyConstraint(['menor_unidade_id'], ['unidades.id'], )
     )
     op.create_index(op.f('ix_unidades_id'), 'unidades', ['id'], unique=False)
     op.create_index(op.f('ix_unidades_codigo'), 'unidades', ['codigo'], unique=True)
     
-    # Create fornecedores table
-    op.create_table('fornecedores',
-        sa.Column('id', sa.Integer(), nullable=False),
+    # Create fornecedor table (CORRIGIDO: nome e colunas)
+    op.create_table('fornecedor',
+        sa.Column('id_fornecedor', sa.Integer(), nullable=False),
         sa.Column('cnpj', sa.String(length=18), nullable=False),
         sa.Column('nome', sa.String(), nullable=False),
         sa.Column('endereco', sa.String(), nullable=True),
-        sa.Column('is_active', sa.Boolean(), nullable=False),
+        sa.Column('ativo', sa.Boolean(), nullable=False),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
         sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
-        sa.PrimaryKeyConstraint('id')
+        sa.PrimaryKeyConstraint('id_fornecedor')
     )
-    op.create_index(op.f('ix_fornecedores_id'), 'fornecedores', ['id'], unique=False)
-    op.create_index(op.f('ix_fornecedores_cnpj'), 'fornecedores', ['cnpj'], unique=True)
+    op.create_index(op.f('ix_fornecedor_id'), 'fornecedor', ['id_fornecedor'], unique=False)
+    op.create_index(op.f('ix_fornecedor_cnpj'), 'fornecedor', ['cnpj'], unique=True)
     
     # Create materias_primas table
     op.create_table('materias_primas',
@@ -132,10 +133,10 @@ def upgrade() -> None:
     op.create_index(op.f('ix_materias_primas_id'), 'materias_primas', ['id'], unique=False)
     op.create_index(op.f('ix_materias_primas_nome'), 'materias_primas', ['nome'], unique=True)
     
-    # Create notas table
+    # Create notas table (CORRIGIDO: numero VARCHAR, is_active, is_pinned)
     op.create_table('notas',
         sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('numero', sa.Integer(), nullable=False),
+        sa.Column('numero', sa.String(length=50), nullable=False),
         sa.Column('serie', sa.String(length=10), nullable=False),
         sa.Column('chave_acesso', sa.String(length=44), nullable=True),
         sa.Column('fornecedor_id', sa.Integer(), nullable=False),
@@ -147,8 +148,10 @@ def upgrade() -> None:
         sa.Column('status', postgresql.ENUM('rascunho', 'processando', 'processada', 'falha', name='statusnota', create_type=False), nullable=False),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
         sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
+        sa.Column('is_active', sa.Boolean(), nullable=False, server_default='true'),
+        sa.Column('is_pinned', sa.Boolean(), nullable=False, server_default='false'),
         sa.PrimaryKeyConstraint('id'),
-        sa.ForeignKeyConstraint(['fornecedor_id'], ['fornecedores.id'], )
+        sa.ForeignKeyConstraint(['fornecedor_id'], ['fornecedor.id_fornecedor'], )
     )
     op.create_index(op.f('ix_notas_id'), 'notas', ['id'], unique=False)
     op.create_index(op.f('ix_notas_chave_acesso'), 'notas', ['chave_acesso'], unique=True)
@@ -183,7 +186,7 @@ def upgrade() -> None:
         sa.Column('nota_id', sa.Integer(), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
         sa.PrimaryKeyConstraint('id'),
-        sa.ForeignKeyConstraint(['fornecedor_id'], ['fornecedores.id'], ),
+        sa.ForeignKeyConstraint(['fornecedor_id'], ['fornecedor.id_fornecedor'], ),
         sa.ForeignKeyConstraint(['materia_prima_id'], ['materias_primas.id'], ),
         sa.ForeignKeyConstraint(['nota_id'], ['notas.id'], )
     )
@@ -228,12 +231,25 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_produto_precos_id'), 'produto_precos', ['id'], unique=False)
     
-    # Add foreign key constraints for unidades self-reference
-    op.create_foreign_key(None, 'unidades', 'unidades', ['menor_unidade_codigo'], ['codigo'])
+    # Create produtos_finais table (NOVO)
+    op.create_table('produtos_finais',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('nome', sa.String(), nullable=False),
+        sa.Column('descricao', sa.String(), nullable=True),
+        sa.Column('id_unico', sa.String(), nullable=True),
+        sa.Column('componentes', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column('ativo', sa.Boolean(), nullable=False, server_default='true'),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
+        sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
+        sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_produtos_finais_id'), 'produtos_finais', ['id'], unique=False)
+    op.create_index(op.f('ix_produtos_finais_nome'), 'produtos_finais', ['nome'], unique=True)
 
 
 def downgrade() -> None:
     # Drop tables in reverse order
+    op.drop_table('produtos_finais')
     op.drop_table('produto_precos')
     op.drop_table('produto_componentes')
     op.drop_table('produtos')
@@ -241,7 +257,7 @@ def downgrade() -> None:
     op.drop_table('nota_itens')
     op.drop_table('notas')
     op.drop_table('materias_primas')
-    op.drop_table('fornecedores')
+    op.drop_table('fornecedor')
     op.drop_table('unidades')
     op.drop_table('audit_logs')
     op.drop_table('users')
