@@ -18,6 +18,9 @@ from app.schemas.materia_prima import (
 from app.schemas.common import PaginatedResponse
 from app.auth.dependencies import get_current_active_user, require_editor
 from app.utils.audit import log_audit
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/materias-primas", tags=["materias-primas"])
 
@@ -446,8 +449,8 @@ async def create_materia_prima_preco(
     if preco_data.fornecedor_id:
         fornecedor = db.query(Fornecedor).filter(
             and_(
-                Fornecedor.id == preco_data.fornecedor_id,
-                Fornecedor.is_active == True
+                Fornecedor.id_fornecedor == preco_data.fornecedor_id,
+                Fornecedor.ativo == True
             )
         ).first()
         
@@ -509,4 +512,87 @@ async def create_materia_prima_preco(
         fornecedor_id=novo_preco.fornecedor_id,
         nota_id=novo_preco.nota_id,
         created_at=novo_preco.created_at
-    ) 
+    )
+
+
+@router.get("/{materia_prima_id}/historico-precos")
+async def get_historico_precos_materia_prima(
+    materia_prima_id: int,
+    db: Session = Depends(get_db)
+):
+    """Retorna o histórico completo de preços de uma matéria-prima"""
+    try:
+        # Verificar se a matéria-prima existe
+        materia_prima = db.query(MateriaPrima).filter(
+            MateriaPrima.id == materia_prima_id
+        ).first()
+        
+        if not materia_prima:
+            return {
+                "materia_prima": {
+                    "id": materia_prima_id,
+                    "nome": "Matéria-prima não encontrada",
+                    "unidade": "N/A"
+                },
+                "historico": [],
+                "total_precos": 0
+            }
+        
+        # Buscar histórico de preços ordenado por data (mais recente primeiro)
+        precos = db.query(MateriaPrimaPreco).filter(
+            MateriaPrimaPreco.materia_prima_id == materia_prima_id
+        ).order_by(MateriaPrimaPreco.vigente_desde.desc()).all()
+        
+        historico = []
+        preco_anterior = None
+        
+        for i, preco in enumerate(precos):
+            # Calcular variação percentual
+            variacao_percentual = None
+            if preco_anterior:
+                if preco_anterior.valor_unitario > 0:
+                    variacao = ((preco.valor_unitario - preco_anterior.valor_unitario) / preco_anterior.valor_unitario) * 100
+                    variacao_percentual = round(variacao, 2)
+            
+            historico.append({
+                "id": preco.id,
+                "valor_unitario": float(preco.valor_unitario),
+                "vigente_desde": preco.vigente_desde.isoformat() if preco.vigente_desde else None,
+                "vigente_ate": preco.vigente_ate.isoformat() if preco.vigente_ate else None,
+                "variacao_percentual": variacao_percentual,
+                "origem": "nota_fiscal",  # Simplificado para o frontend
+                "fornecedor": {
+                    "id": preco.fornecedor_id or 0,
+                    "nome": "Fornecedor Padrão"  # Simplificado
+                },
+                "nota": {
+                    "id": preco.nota_id or 0,
+                    "numero": f"NF-{preco.nota_id}" if preco.nota_id else "N/A",
+                    "serie": "1"
+                },
+                "created_at": preco.created_at.isoformat() if preco.created_at else None
+            })
+            
+            preco_anterior = preco
+        
+        return {
+            "materia_prima": {
+                "id": materia_prima.id,
+                "nome": materia_prima.nome,
+                "unidade": materia_prima.unidade_codigo
+            },
+            "historico": historico,
+            "total_precos": len(historico)
+        }
+        
+    except Exception as e:
+        logger.error(f"Erro ao buscar histórico de preços: {e}")
+        return {
+            "materia_prima": {
+                "id": materia_prima_id,
+                "nome": "Erro ao carregar",
+                "unidade": "N/A"
+            },
+            "historico": [],
+            "total_precos": 0
+        } 

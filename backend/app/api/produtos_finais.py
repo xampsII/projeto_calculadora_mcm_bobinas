@@ -20,11 +20,21 @@ async def criar_produto_final(
 ):
     """Criar produto final"""
     try:
+        # Converter componentes para dicionários se necessário
+        componentes_dict = []
+        for componente in produto.componentes:
+            if hasattr(componente, 'dict'):
+                componentes_dict.append(componente.dict())
+            elif hasattr(componente, 'model_dump'):
+                componentes_dict.append(componente.model_dump())
+            else:
+                componentes_dict.append(componente)
+        
         # Criar produto
         novo_produto = ProdutoFinal(
             nome=produto.nome,
-            descricao=produto.descricao,
-            componentes=produto.componentes,
+            id_unico=produto.idUnico,
+            componentes=componentes_dict,
             ativo=True
         )
         
@@ -155,11 +165,24 @@ async def listar_produtos_finais(
         produtos_formatados = []
         for produto in produtos:
             try:
+                # Calcular custo total baseado nos componentes
+                custo_total = 0.0
+                if produto.componentes:
+                    for componente in produto.componentes:
+                        try:
+                            quantidade = float(componente.get('quantidade', 0))
+                            valor_unitario = float(componente.get('valorUnitario', 0))
+                            custo_total += quantidade * valor_unitario
+                        except (ValueError, TypeError) as e:
+                            print(f"DEBUG: Erro ao calcular custo do componente {componente}: {e}")
+                            continue
+                
                 produtos_formatados.append({
                     "id": produto.id,
                     "nome": produto.nome,
-                    "descricao": produto.descricao,
+                    "idUnico": produto.id_unico,
                     "componentes": produto.componentes,
+                    "custo_total": round(custo_total, 2),  # Custo calculado
                     "ativo": produto.ativo,
                     "created_at": produto.created_at.isoformat() if produto.created_at else None,
                     "updated_at": produto.updated_at.isoformat() if produto.updated_at else None
@@ -191,11 +214,24 @@ async def obter_produto_final(
                 detail="Produto final não encontrado"
             )
         
+        # Calcular custo total baseado nos componentes
+        custo_total = 0.0
+        if produto.componentes:
+            for componente in produto.componentes:
+                try:
+                    quantidade = float(componente.get('quantidade', 0))
+                    valor_unitario = float(componente.get('valorUnitario', 0))
+                    custo_total += quantidade * valor_unitario
+                except (ValueError, TypeError) as e:
+                    print(f"DEBUG: Erro ao calcular custo do componente {componente}: {e}")
+                    continue
+        
         return {
             "id": produto.id,
             "nome": produto.nome,
-            "descricao": produto.descricao,
+            "idUnico": produto.id_unico,
             "componentes": produto.componentes,
+            "custo_total": round(custo_total, 2),
             "ativo": produto.ativo,
             "created_at": produto.created_at.isoformat() if produto.created_at else None,
             "updated_at": produto.updated_at.isoformat() if produto.updated_at else None
@@ -226,10 +262,20 @@ async def atualizar_produto_final(
                 detail="Produto final não encontrado"
             )
         
+        # Converter componentes para dicionários se necessário
+        componentes_dict = []
+        for componente in produto.componentes:
+            if hasattr(componente, 'dict'):
+                componentes_dict.append(componente.dict())
+            elif hasattr(componente, 'model_dump'):
+                componentes_dict.append(componente.model_dump())
+            else:
+                componentes_dict.append(componente)
+        
         # Atualizar campos
         produto_existente.nome = produto.nome
-        produto_existente.descricao = produto.descricao
-        produto_existente.componentes = produto.componentes
+        produto_existente.id_unico = produto.idUnico
+        produto_existente.componentes = componentes_dict
         
         db.commit()
         db.refresh(produto_existente)
