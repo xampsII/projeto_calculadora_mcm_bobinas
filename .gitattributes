@@ -1,0 +1,8 @@
+# Garantir que scripts shell sempre usem LF (Unix)
+*.sh text eol=lf
+docker/backend/init.sh text eol=lf
+docker/postgres/init/*.sh text eol=lf
+
+# Arquivos SQL também devem usar LF
+*.sql text eol=lf
+

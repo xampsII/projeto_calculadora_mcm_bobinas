@@ -21,7 +21,7 @@ echo "Banco de dados pronto!"
 echo "Aguardando inicializacao completa..."
 sleep 10
 
-# Executar migrações
+# Executar migraÃ§Ãµes
 echo "Criando tabelas..."
 alembic upgrade head || echo "Erro nas migracoes, mas continuando..."
 
@@ -35,6 +35,6 @@ python -m app.seeds || echo "Seeds falharam (normal se backup ja populou dados)"
 
 echo "Sistema pronto para iniciar!"
 
-# Iniciar aplicação
+# Iniciar aplicaÃ§Ã£o
 echo "Iniciando FastAPI..."
 exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
