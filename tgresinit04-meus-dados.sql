@@ -1,0 +1,21 @@
+[1mdiff --git a/docker/backend/init.sh b/docker/backend/init.sh[m
+[1mindex 8ed4870..284456c 100644[m
+[1m--- a/docker/backend/init.sh[m
+[1m+++ b/docker/backend/init.sh[m
+[36m@@ -21,7 +21,7 @@[m [mecho "Banco de dados pronto!"[m
+ echo "Aguardando inicializacao completa..."[m
+ sleep 10[m
+ [m
+[31m-# Executar migrações[m
+[32m+[m[32m# Executar migraÃ§Ãµes[m
+ echo "Criando tabelas..."[m
+ alembic upgrade head || echo "Erro nas migracoes, mas continuando..."[m
+ [m
+[36m@@ -35,6 +35,6 @@[m [mpython -m app.seeds || echo "Seeds falharam (normal se backup ja populou dados)"[m
+ [m
+ echo "Sistema pronto para iniciar!"[m
+ [m
+[31m-# Iniciar aplicação[m
+[32m+[m[32m# Iniciar aplicaÃ§Ã£o[m
+ echo "Iniciando FastAPI..."[m
+ exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload[m
