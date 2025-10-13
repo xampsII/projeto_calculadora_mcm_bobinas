@@ -59,6 +59,21 @@ docker-compose down -v
 
 ## **❓ PROBLEMAS COMUNS:**
 
+### **Backend não sobe:**
+```bash
+# 1. Ver logs do backend
+docker-compose logs backend
+
+# 2. Ver logs em tempo real
+docker-compose logs -f backend
+
+# 3. Verificar status dos containers
+docker-compose ps
+
+# 4. Se backend está "Exit" ou "Restarting", reiniciar:
+docker-compose restart backend
+```
+
 ### **Porta já em uso:**
 ```bash
 # Verificar o que está usando as portas
@@ -68,10 +83,19 @@ netstat -ano | findstr :5173
 ```
 
 ### **Banco vazio (sem dados):**
-Verifique se o arquivo `docker/postgres/init/04-meus-dados.backup` existe no projeto.
+```bash
+# Verificar se backup existe
+dir docker\postgres\init\04-meus-dados.backup
+
+# Ver logs do banco
+docker-compose logs db
+```
 
 ### **Erro de conexão:**
-Aguarde alguns minutos. O PostgreSQL pode demorar para inicializar completamente.
+Aguarde 5-10 minutos. O PostgreSQL pode demorar para:
+- Criar o banco
+- Restaurar o backup (pode ter muitos dados)
+- Executar migrações
 
 ---
 
