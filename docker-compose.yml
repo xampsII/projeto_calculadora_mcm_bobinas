@@ -1,7 +1,7 @@
 ﻿services:
   # Banco PostgreSQL
   db:
-    image: postgres:17
+    image: postgres:15
     container_name: nfe_postgres
     environment:
       - POSTGRES_DB=nfedb
