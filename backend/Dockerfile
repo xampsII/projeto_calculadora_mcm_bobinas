@@ -22,17 +22,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiar código da aplicação
 COPY . .
 
-# Copiar script de exportação se existir
-COPY ../scripts/export_sqlite_to_postgres.py ./scripts/ 2>/dev/null || true
-
 # Criar diretórios necessários
 RUN mkdir -p uploads scripts
-
-# Tornar scripts executáveis
-RUN chmod +x scripts/*.py 2>/dev/null || true
-
-# Verificar se arquivo SQLite existe e copiar
-COPY nfe_system.db ./nfe_system.db 2>/dev/null || echo "SQLite file not found, will use seeds only"
 
 # Expor porta
 EXPOSE 8000
