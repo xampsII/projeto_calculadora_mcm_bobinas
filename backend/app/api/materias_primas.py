@@ -7,6 +7,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.materia_prima import MateriaPrima, MateriaPrimaPreco
 from app.models.fornecedor import Fornecedor
+from app.models.nota import Nota
 from app.models.unidade import Unidade
 from app.schemas.materia_prima import (
     MateriaPrimaCreate,
@@ -513,6 +514,96 @@ async def create_materia_prima_preco(
         nota_id=novo_preco.nota_id,
         created_at=novo_preco.created_at
     )
+
+
+@router.get("/historico-precos/todos")
+async def get_historico_precos_todas_materias(
+    db: Session = Depends(get_db)
+):
+    """Retorna o histórico completo de preços de todas as matérias-primas"""
+    try:
+        # Buscar todas as matérias-primas ativas
+        materias_primas = db.query(MateriaPrima).filter(
+            MateriaPrima.is_active == True
+        ).order_by(MateriaPrima.nome).all()
+        
+        resultado = []
+        
+        for mp in materias_primas:
+            # Buscar histórico de preços ordenado por data (mais recente primeiro)
+            precos = db.query(MateriaPrimaPreco).filter(
+                MateriaPrimaPreco.materia_prima_id == mp.id
+            ).order_by(MateriaPrimaPreco.vigente_desde.desc()).all()
+            
+            if precos:  # Só adiciona se tiver histórico
+                historico = []
+                preco_anterior = None
+                
+                for i, preco in enumerate(precos):
+                    # Calcular variação percentual
+                    variacao_percentual = None
+                    if preco_anterior:
+                        if preco_anterior.valor_unitario > 0:
+                            variacao = ((preco.valor_unitario - preco_anterior.valor_unitario) / preco_anterior.valor_unitario) * 100
+                            variacao_percentual = round(variacao, 2)
+                    
+                    # Buscar fornecedor e nota relacionados
+                    fornecedor_nome = "N/A"
+                    if preco.fornecedor_id:
+                        fornecedor = db.query(Fornecedor).filter(Fornecedor.id_fornecedor == preco.fornecedor_id).first()
+                        if fornecedor:
+                            fornecedor_nome = fornecedor.nome
+                    
+                    nota_numero = "N/A"
+                    nota_serie = "N/A"
+                    if preco.nota_id:
+                        nota = db.query(Nota).filter(Nota.id == preco.nota_id).first()
+                        if nota:
+                            nota_numero = nota.numero or f"NF-{nota.id}"
+                            nota_serie = nota.serie or "1"
+                    
+                    historico.append({
+                        "id": preco.id,
+                        "valor_unitario": float(preco.valor_unitario),
+                        "vigente_desde": preco.vigente_desde.isoformat() if preco.vigente_desde else None,
+                        "vigente_ate": preco.vigente_ate.isoformat() if preco.vigente_ate else None,
+                        "variacao_percentual": variacao_percentual,
+                        "origem": "nota_fiscal",
+                        "fornecedor": {
+                            "id": preco.fornecedor_id or 0,
+                            "nome": fornecedor_nome
+                        },
+                        "nota": {
+                            "id": preco.nota_id or 0,
+                            "numero": nota_numero,
+                            "serie": nota_serie
+                        },
+                        "created_at": preco.created_at.isoformat() if preco.created_at else None
+                    })
+                    
+                    preco_anterior = preco
+                
+                resultado.append({
+                    "materia_prima": {
+                        "id": mp.id,
+                        "nome": mp.nome,
+                        "unidade": mp.unidade_codigo
+                    },
+                    "historico": historico,
+                    "total_precos": len(historico)
+                })
+        
+        return {
+            "materias_primas": resultado,
+            "total_materias_com_historico": len(resultado)
+        }
+        
+    except Exception as e:
+        logger.error(f"Erro ao buscar histórico de preços: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao buscar histórico de preços: {str(e)}"
+        )
 
 
 @router.get("/{materia_prima_id}/historico-precos")

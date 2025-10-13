@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Save, X, Package, Info } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import NotificationToast from './NotificationToast';
@@ -22,11 +22,16 @@ const UNIDADES_BOBINA = [
 ];
 
 const CrudMateriasPrimas: React.FC = () => {
-  const { materiasPrimas, unidadesMedida, adicionarMateriaPrima, atualizarMateriaPrima, excluirMateriaPrima } = useApp();
+  const { materiasPrimas, unidadesMedida, adicionarMateriaPrima, atualizarMateriaPrima, excluirMateriaPrima, carregarMateriasPrimas } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // Carregar matérias-primas ao montar o componente
+  useEffect(() => {
+    carregarMateriasPrimas();
+  }, [carregarMateriasPrimas]);
 
   const [formData, setFormData] = useState({
     nome: '',

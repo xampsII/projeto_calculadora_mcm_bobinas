@@ -13,7 +13,7 @@ import {
   PaginatedResponse
 } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+const API_BASE_URL = 'http://127.0.0.1:8000';
 
 const AppContext = createContext<AppContextType | null>(null);
 
@@ -56,7 +56,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data: PaginatedResponse<NotaFiscal> = await response.json();
-      setNotasFiscais(data.data ?? []);
+      setNotasFiscais(data.items ?? []);
       return data;
     } catch (error) {
       console.error("Erro ao buscar notas fiscais:", error);
@@ -82,12 +82,29 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   // CRUD Matérias-primas
   const carregarMateriasPrimas = async (): Promise<void> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/materias-primas/`);
+      // Carregar todas as matérias-primas (usando page_size máximo)
+      const response = await fetch(`${API_BASE_URL}/materias-primas/?page_size=100`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      const data: { items: MateriaPrima[] } = await response.json();
-      setMateriasPrimas(data.items);
+      const data: PaginatedResponse<MateriaPrima> = await response.json();
+      
+      // Se há mais páginas, carregar também
+      let todasMaterias = [...data.items];
+      
+      if (data.total_pages > 1) {
+        // Carregar páginas restantes
+        for (let page = 2; page <= data.total_pages; page++) {
+          const nextResponse = await fetch(`${API_BASE_URL}/materias-primas/?page=${page}&page_size=100`);
+          if (nextResponse.ok) {
+            const nextData: PaginatedResponse<MateriaPrima> = await nextResponse.json();
+            todasMaterias = [...todasMaterias, ...nextData.items];
+          }
+        }
+      }
+      
+      setMateriasPrimas(todasMaterias);
+      console.log(`${todasMaterias.length} matérias-primas carregadas com sucesso!`);
     } catch (error) {
       console.error("Erro ao carregar matérias-primas:", error);
     }

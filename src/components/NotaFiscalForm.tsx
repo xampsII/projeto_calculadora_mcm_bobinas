@@ -35,7 +35,8 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
     adicionarNotaFiscal, 
     atualizarNotaFiscal, 
     obterNotaFiscal,
-    importarNotasFiscais
+    importarNotasFiscais,
+    buscarNotasFiscais
   } = useApp();
   
   const [activeMode, setActiveMode] = useState<'import'>('import');
@@ -228,6 +229,24 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
         if (onSalvar && result.data) {
           onSalvar(result.data);
         }
+        
+        // Recarregar lista de notas fiscais
+        try {
+          await buscarNotasFiscais({
+            page: 1,
+            limit: 25,
+            busca: '',
+            fornecedor: '',
+            materiaPrima: '',
+            dataInicio: '',
+            dataFim: '',
+            sortBy: 'dataEmissao',
+            sortOrder: 'desc',
+          });
+        } catch (error) {
+          console.error('Erro ao recarregar lista de notas:', error);
+        }
+        
         if (!notaId) {
           // Reset form for new nota
           setFormData({

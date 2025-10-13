@@ -9,8 +9,10 @@ RUN apt-get update && apt-get install -y \
     g++ \
     libffi-dev \
     libssl-dev \
-    nodejs \
-    npm \
+    libpq-dev \
+    postgresql-client \
+    curl \
+    bash \
     && rm -rf /var/lib/apt/lists/*
 
 # Copiar requirements primeiro (para cache do Docker)
@@ -20,11 +22,20 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiar código da aplicação
 COPY . .
 
-# Criar diretório para uploads
-RUN mkdir -p uploads
+# Copiar script de exportação se existir
+COPY ../scripts/export_sqlite_to_postgres.py ./scripts/ 2>/dev/null || true
+
+# Criar diretórios necessários
+RUN mkdir -p uploads scripts
+
+# Tornar scripts executáveis
+RUN chmod +x scripts/*.py 2>/dev/null || true
+
+# Verificar se arquivo SQLite existe e copiar
+COPY nfe_system.db ./nfe_system.db 2>/dev/null || echo "SQLite file not found, will use seeds only"
 
 # Expor porta
 EXPOSE 8000
 
-# Comando para iniciar
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Comando para iniciar (será sobrescrito pelo docker-compose)
+CMD ["sh", "/app/init.sh"]

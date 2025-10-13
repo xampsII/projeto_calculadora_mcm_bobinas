@@ -104,7 +104,16 @@ const CrudProdutos: React.FC = () => {
     try {
       // Verificar se já existe um produto com nome "MCM58-Teste"
       const response = await fetch(`${API_BASE_URL}/produtos-finais/`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const produtos = await response.json();
+      
+      // Verificar se produtos é um array
+      if (!Array.isArray(produtos)) {
+        console.error('Resposta da API não é um array:', produtos);
+        return;
+      }
       
       const produtoExiste = produtos.find((p: any) => p.nome === 'MCM58-Teste');
       
@@ -186,6 +195,10 @@ const CrudProdutos: React.FC = () => {
           console.log('Produto presetado criado com sucesso!');
           // Recarregar a lista de produtos
           carregarProdutosFinais();
+        } else {
+          const errorData = await createResponse.json();
+          console.error('Erro ao criar produto:', errorData);
+          throw new Error(`Erro ao criar produto: ${errorData.detail || createResponse.statusText}`);
         }
       }
     } catch (error) {
@@ -474,6 +487,7 @@ const CrudProdutos: React.FC = () => {
       if (result.success) {
         resetCalculator();
         setShowForm(false); // Fechar formulário após sucesso
+        await carregarProdutosFinais(); // Recarregar lista de produtos
       }
     } catch (error) {
       console.error('=== ERRO CAPTURADO ===');
@@ -500,6 +514,10 @@ const CrudProdutos: React.FC = () => {
         message: result.message,
         type: result.success ? 'success' : 'error',
       });
+      
+      if (result.success) {
+        await carregarProdutosFinais(); // Recarregar lista após exclusão
+      }
     } catch (error) {
       setNotification({
         message: 'Erro ao excluir produto.',
@@ -514,6 +532,15 @@ const CrudProdutos: React.FC = () => {
     console.log('=== EDITANDO PRODUTO ===');
     console.log('Produto:', produto);
     console.log('Componentes:', produto.componentes);
+    
+    // Verificar se o produto tem componentes
+    if (!produto.componentes || produto.componentes.length === 0) {
+      setNotification({
+        message: 'Este produto não possui componentes para editar.',
+        type: 'error',
+      });
+      return;
+    }
     
     // Preencher o formulário com os dados do produto
     const materiasPrimasEditadas = produto.componentes?.map((comp: any, index: number) => {

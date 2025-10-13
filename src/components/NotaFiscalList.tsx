@@ -64,7 +64,7 @@ const NotaFiscalList: React.FC<NotaFiscalListProps> = ({ onNovaNota, onEditarNot
         page: currentPage,
         limit: itemsPerPage,
       });
-      setNotas(result.data);
+      setNotas(result.items);
       setTotal(result.total);
     } catch (error) {
       setNotification({
@@ -275,25 +275,25 @@ const NotaFiscalList: React.FC<NotaFiscalListProps> = ({ onNovaNota, onEditarNot
                   {(notas ?? []).map((nota) => (
                     <tr key={nota.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{nota.numeroNota}</div>
+                        <div className="text-sm font-medium text-gray-900">{nota.numero}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <Building className="h-4 w-4 text-gray-500 mr-2" />
-                          <div className="text-sm text-gray-900">{nota.fornecedorNome}</div>
+                          <div className="text-sm text-gray-900">{nota.fornecedor?.nome || '-'}</div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {nota.cnpjFornecedor ? formatCNPJ(nota.cnpjFornecedor) : '-'}
+                        {nota.fornecedor?.cnpj ? formatCNPJ(nota.fornecedor.cnpj) : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <Calendar className="h-4 w-4 text-gray-500 mr-2" />
-                          <div className="text-sm text-gray-900">{formatDate(nota.dataEmissao)}</div>
+                          <div className="text-sm text-gray-900">{formatDate(nota.emissao_date)}</div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {formatCurrency(nota.valorTotal)}
+                        {formatCurrency(Number(nota.valor_total))}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {nota.itens ? nota.itens.length : 0} {nota.itens && nota.itens.length === 1 ? 'item' : 'itens'}

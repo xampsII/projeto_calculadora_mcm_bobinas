@@ -15,8 +15,10 @@ export const formatNumber = (value: number, decimals: number = 2): string => {
 };
 
 // Formatação de data brasileira
-export const formatDate = (date: string | Date): string => {
+export const formatDate = (date: string | Date | null | undefined): string => {
+  if (!date) return '-';
   const dateObj = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(dateObj.getTime())) return '-';
   return dateObj.toLocaleDateString('pt-BR');
 };
 

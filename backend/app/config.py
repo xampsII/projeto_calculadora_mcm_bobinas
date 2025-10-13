@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=str(ENV_PATH), extra="ignore")
 
     # URL pronta (opção preferida)
-    DATABASE_URL: Optional[str] = None
+    DATABASE_URL: Optional[str] = "sqlite:///./backend/nfe_system.db"
 
     # Componentes para montar a URL (fallback)
     DB_HOST_POOLER: Optional[str] = None
@@ -61,6 +61,10 @@ class Settings(BaseSettings):
     
     # ---- Upload ----
     UPLOAD_DIR: str = "uploads"  # diretório para uploads de arquivos
+    
+    # ---- API Server ----
+    API_HOST: str = "0.0.0.0"
+    API_PORT: int = 8000
 
     @property
     def cors_origins_list(self) -> list[str]:
