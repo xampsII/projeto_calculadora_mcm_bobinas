@@ -71,8 +71,35 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      const data: NotaFiscal = await response.json();
-      return data;
+      const data: any = await response.json();
+      
+      // Adaptar resposta do backend para formato do frontend
+      const notaAdaptada: NotaFiscal = {
+        id: data.id.toString(),
+        numeroNota: data.numero,
+        fornecedorId: data.fornecedor_id?.toString(),
+        fornecedorNome: data.fornecedor?.nome || '',
+        cnpjFornecedor: data.fornecedor?.cnpj || '',
+        enderecoFornecedor: '',
+        dataEmissao: data.emissao_date,
+        valorTotal: parseFloat(data.valor_total),
+        observacoes: '',
+        itens: data.itens?.map((item: any) => ({
+          id: item.id.toString(),
+          materiaPrimaNome: item.nome_no_documento,
+          unidadeMedida: item.unidade_codigo,
+          menorUnidadeUso: '',
+          quantidade: parseFloat(item.quantidade),
+          valorUnitario: parseFloat(item.valor_unitario),
+          valorTotal: parseFloat(item.valor_total),
+          materiaPrimaId: item.materia_prima_id?.toString()
+        })) || [],
+        createdAt: data.created_at,
+        updatedAt: data.updated_at || '',
+        is_pinned: data.is_pinned || false
+      };
+      
+      return notaAdaptada;
     } catch (error) {
       console.error("Erro ao obter nota fiscal:", error);
       return null;
