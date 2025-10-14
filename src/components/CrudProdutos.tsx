@@ -428,21 +428,15 @@ const CrudProdutos: React.FC = () => {
     const componentes = calculatorData.materiasPrimas
       .filter(mp => mp.nome && mp.quantidade > 0)
       .map(mp => {
-        // Buscar o valor unitário atual das matérias-primas disponíveis
-        const materiaPrimaDisponivel = materiasPrimasDisponiveis.find(
-          disp => disp.nome === mp.nome
-        );
+        // USAR O VALOR EDITADO MANUALMENTE (mp.valorUnitario)
+        // Priorizar o valor que está no state (editado pelo usuário)
+        const valorUnitario = mp.valorUnitario || 0.01;
         
-        const valorUnitario = materiaPrimaDisponivel?.valorUnitario || mp.valorUnitario || 0;
-        
-        // Garantir que sempre tenha um valor válido (mínimo 0.01)
-        const valorFinal = valorUnitario > 0 ? valorUnitario : 0.01;
-        
-        console.log('Mapeando componente:', {
+        console.log('Salvando componente:', {
           nome: mp.nome,
-          valorUnitario: valorFinal,
-          materiaPrimaDisponivel: materiaPrimaDisponivel?.valorUnitario,
-          mpValorUnitario: mp.valorUnitario
+          quantidade: mp.quantidade,
+          valorUnitario: valorUnitario,
+          valorTotal: mp.valorTotal
         });
         
         return {
@@ -450,7 +444,7 @@ const CrudProdutos: React.FC = () => {
           materiaPrimaNome: mp.nome,
           quantidade: mp.quantidade,
           unidadeMedida: mp.unidade,
-          valorUnitario: valorFinal,
+          valorUnitario: valorUnitario,
         };
       });
 
