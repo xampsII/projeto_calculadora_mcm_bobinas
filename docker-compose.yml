@@ -1,29 +1,5 @@
 ﻿services:
-  # Banco PostgreSQL
-  db:
-    image: postgres:15
-    container_name: nfe_postgres
-    environment:
-      - POSTGRES_DB=nfedb
-      - POSTGRES_USER=nfeuser
-      - POSTGRES_PASSWORD=nfepass
-      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./docker/postgres/init:/docker-entrypoint-initdb.d
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nfeuser -d nfedb"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    restart: unless-stopped
-    networks:
-      - nfe_network
-
-  # Backend FastAPI
+  # Backend FastAPI (usando SQLite)
   backend:
     build: 
       context: ./backend
@@ -32,22 +8,15 @@
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://nfeuser:nfepass@db:5432/nfedb?sslmode=disable
+      - DATABASE_URL=sqlite:///./nfe_system.db
       - SECRET_KEY=sua_chave_secreta_docker_123456
       - DEBUG=True
       - CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
       - UPLOAD_DIR=uploads
-      - REDIS_URL=redis://redis:6379/0
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
     volumes:
       - ./backend/uploads:/app/uploads
-      - ./docker/backend/init.sh:/app/init.sh
-      - ./backend/nfe_system.db:/app/nfe_system.db:ro
-    command: ["sh", "/app/init.sh"]
+      - ./backend/nfe_system.db:/app/nfe_system.db
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     restart: unless-stopped
     networks:
       - nfe_network
@@ -68,23 +37,6 @@
     networks:
       - nfe_network
 
-  # Redis (para cache e filas)
-  redis:
-    image: redis:7-alpine
-    container_name: nfe_redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    restart: unless-stopped
-    networks:
-      - nfe_network
-
-volumes:
-  postgres_data:
-    driver: local
-  redis_data:
-    driver: local
 
 networks:
   nfe_network:

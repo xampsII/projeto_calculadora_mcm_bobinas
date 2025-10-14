@@ -9,8 +9,6 @@ RUN apt-get update && apt-get install -y \
     g++ \
     libffi-dev \
     libssl-dev \
-    libpq-dev \
-    postgresql-client \
     curl \
     bash \
     && rm -rf /var/lib/apt/lists/*
@@ -29,4 +27,4 @@ RUN mkdir -p uploads scripts
 EXPOSE 8000
 
 # Comando para iniciar (será sobrescrito pelo docker-compose)
-CMD ["sh", "/app/init.sh"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
