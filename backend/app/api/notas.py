@@ -272,6 +272,24 @@ async def create_nota(
             )
             db.add(item)
             print(f"DEBUG: Item criado: {item_data.nome_no_documento}")
+            
+            # Registrar preço no histórico (se matéria-prima foi identificada)
+            if materia_prima_id:
+                # Converter data para datetime se necessário
+                vigente_desde = nota_data.emissao_date
+                if isinstance(vigente_desde, date) and not isinstance(vigente_desde, datetime):
+                    vigente_desde = datetime.combine(vigente_desde, datetime.min.time())
+                
+                novo_preco = MateriaPrimaPreco(
+                    materia_prima_id=materia_prima_id,
+                    valor_unitario=item_data.valor_unitario,
+                    moeda="BRL",
+                    vigente_desde=vigente_desde,
+                    fornecedor_id=nota_data.fornecedor_id,
+                    nota_id=nota.id
+                )
+                db.add(novo_preco)
+                print(f"DEBUG: Preço registrado no histórico: R$ {item_data.valor_unitario}")
         
         db.commit()
         db.refresh(nota)
