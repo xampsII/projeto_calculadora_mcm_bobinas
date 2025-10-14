@@ -1,0 +1,89 @@
+================================================================================
+🚀 COMANDO ÚNICO PARA ATUALIZAR E REINICIAR TUDO
+================================================================================
+
+COPIE E COLE ESTE COMANDO NO TERMINAL (Git Bash ou PowerShell):
+
+--------------------------------------------------------------------------------
+OPÇÃO 1: Git Bash (Recomendado)
+--------------------------------------------------------------------------------
+
+git checkout -- backend/nfe_system.db && git pull origin main && docker-compose down -v && docker-compose build --no-cache backend && docker-compose up -d && echo "✅ Sistema atualizado! Aguarde 30 segundos e acesse http://localhost:5173"
+
+
+--------------------------------------------------------------------------------
+OPÇÃO 2: PowerShell (Se Git Bash não funcionar)
+--------------------------------------------------------------------------------
+
+git checkout -- backend/nfe_system.db; git pull origin main; docker-compose down -v; docker-compose build --no-cache backend; docker-compose up -d; Write-Host "✅ Sistema atualizado! Aguarde 30 segundos e acesse http://localhost:5173"
+
+
+================================================================================
+O QUE ESSE COMANDO FAZ:
+================================================================================
+
+1. git checkout -- backend/nfe_system.db
+   → Descarta alterações locais no banco de dados
+
+2. git pull origin main
+   → Baixa todas as atualizações do servidor
+
+3. docker-compose down -v
+   → Para e REMOVE todos os containers e volumes antigos
+
+4. docker-compose build --no-cache backend
+   → Reconstrói o backend DO ZERO (sem usar cache antigo)
+
+5. docker-compose up -d
+   → Sobe todos os serviços atualizados
+
+6. echo/Write-Host
+   → Mostra mensagem de sucesso
+
+
+================================================================================
+APÓS EXECUTAR:
+================================================================================
+
+1. Aguarde 30-60 segundos (o backend precisa inicializar)
+
+2. Acesse: http://localhost:5173
+
+3. Teste:
+   ✓ Importar nota fiscal XML
+   ✓ Ver histórico de preços em "Matérias-Primas"
+   ✓ Clicar "Recalcular Preços" em "Produtos"
+
+
+================================================================================
+SE DER ALGUM ERRO:
+================================================================================
+
+Execute para ver os logs:
+
+docker-compose logs backend --tail=100
+
+
+================================================================================
+VERIFICAR SE ATUALIZOU:
+================================================================================
+
+git log --oneline -1
+
+Deve mostrar:
+1f7cf7b fix: adicionar logs detalhados para debug de erro 500
+
+
+================================================================================
+TESTAR SE A FUNÇÃO NOVA EXISTE:
+================================================================================
+
+docker-compose exec backend python -c "from app.api.notas import normalizar_nome_materia_prima; print('✅ Função existe!'); print('Teste:', normalizar_nome_materia_prima('-FIO 2.0X7.0 CANTO QUADRADO'))"
+
+Deve mostrar:
+✅ Função existe!
+Teste: FIO 2.0X7.0 CANTO QUADRADO
+
+
+================================================================================
+
