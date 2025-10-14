@@ -80,6 +80,7 @@ const IAAssistant: React.FC<IAAssistantProps> = ({ file, onSuccess, onClose }) =
           </p>
         </div>
 
+
         {notification && (
           <div className={`p-3 rounded-md mb-4 ${
             notification.type === 'success' 
