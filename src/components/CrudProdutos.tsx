@@ -606,12 +606,29 @@ const CrudProdutos: React.FC = () => {
               onClick={async () => {
                 setLoading(true);
                 try {
-                  await carregarProdutosFinais(true); // true = atualizar preços
+                  // Chamar endpoint que SALVA os preços atualizados no banco
+                  const response = await fetch(`${API_BASE_URL}/produtos-finais/atualizar-precos-todos`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                  });
+                  
+                  if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                  }
+                  
+                  const result = await response.json();
+                  
+                  // Recarregar produtos para ver os valores salvos
+                  await carregarProdutosFinais();
+                  
                   setNotification({
-                    message: 'Preços dos produtos atualizados com valores mais recentes!',
+                    message: result.message || 'Preços dos produtos atualizados e salvos com sucesso!',
                     type: 'success',
                   });
                 } catch (error) {
+                  console.error('Erro ao atualizar preços:', error);
                   setNotification({
                     message: 'Erro ao atualizar preços.',
                     type: 'error',
@@ -622,7 +639,7 @@ const CrudProdutos: React.FC = () => {
               }}
               disabled={loading}
               className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium flex items-center space-x-2 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Atualizar preços dos produtos com valores mais recentes do histórico"
+              title="Atualizar preços dos produtos com valores mais recentes do histórico e SALVAR no banco"
             >
               <TrendingUp className="h-4 w-4" />
               <span>{loading ? 'Atualizando...' : 'Recalcular Preços'}</span>
