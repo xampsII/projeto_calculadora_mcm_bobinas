@@ -336,6 +336,9 @@ async def atualizar_precos_todos_produtos(
             # SALVAR no banco se houve atualização
             if houve_atualizacao:
                 produto.componentes = componentes_atualizados
+                # IMPORTANTE: Marcar campo JSON como modificado para SQLAlchemy detectar
+                from sqlalchemy.orm.attributes import flag_modified
+                flag_modified(produto, "componentes")
                 db.add(produto)
                 total_atualizados += 1
         
@@ -388,6 +391,10 @@ async def atualizar_produto_final(
         produto_existente.nome = produto.nome
         produto_existente.id_unico = produto.idUnico
         produto_existente.componentes = componentes_dict
+        
+        # IMPORTANTE: Marcar campo JSON como modificado
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(produto_existente, "componentes")
         
         db.commit()
         db.refresh(produto_existente)
