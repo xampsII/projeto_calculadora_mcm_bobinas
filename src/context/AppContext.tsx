@@ -82,26 +82,24 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   // CRUD Matérias-primas
   const carregarMateriasPrimas = async (): Promise<void> => {
     try {
-      // Carregar todas as matérias-primas (usando page_size máximo)
-      const response = await fetch(`${API_BASE_URL}/materias-primas/?page_size=100`);
+      // Usar o mesmo endpoint que funciona no CrudProdutos
+      const response = await fetch(`${API_BASE_URL}/produtos-finais/materias-primas-disponiveis`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      const data: PaginatedResponse<MateriaPrima> = await response.json();
+      const materias_formatadas = await response.json();
       
-      // Se há mais páginas, carregar também
-      let todasMaterias = [...data.items];
+      // Converter para o formato esperado pelo CrudMateriasPrimas
+      const todasMaterias = materias_formatadas.map((mp: any) => ({
+        id: mp.id,
+        nome: mp.nome,
+        unidade_codigo: mp.unidade,
+        menor_unidade_codigo: mp.unidade,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: null
+      }));
       
-      if (data.total_pages > 1) {
-        // Carregar páginas restantes
-        for (let page = 2; page <= data.total_pages; page++) {
-          const nextResponse = await fetch(`${API_BASE_URL}/materias-primas/?page=${page}&page_size=100`);
-          if (nextResponse.ok) {
-            const nextData: PaginatedResponse<MateriaPrima> = await nextResponse.json();
-            todasMaterias = [...todasMaterias, ...nextData.items];
-          }
-        }
-      }
       
       setMateriasPrimas(todasMaterias);
       console.log(`${todasMaterias.length} matérias-primas carregadas com sucesso!`);
