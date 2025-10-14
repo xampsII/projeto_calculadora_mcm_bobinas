@@ -473,16 +473,16 @@ const CrudMateriasPrimas: React.FC = () => {
                       <div className="text-sm font-medium text-gray-900">{materia.nome}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {materia.unidadeCompra}
+                      {materia.unidade_codigo}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {materia.unidadeUso}
+                      {materia.menor_unidade_codigo || materia.unidade_codigo}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <div>
-                        <span className="font-medium text-gray-900">{materia.fatorConversao}</span>
+                        <span className="font-medium text-gray-900">1.0</span>
                         <div className="text-xs text-gray-500">
-                          1 {materia.unidadeCompra} = {materia.fatorConversao} {materia.unidadeUso}
+                          1 {materia.unidade_codigo} = 1.0 {materia.menor_unidade_codigo || materia.unidade_codigo}
                         </div>
                       </div>
                     </td>

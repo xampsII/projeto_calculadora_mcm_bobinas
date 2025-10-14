@@ -82,29 +82,18 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   // CRUD Matérias-primas
   const carregarMateriasPrimas = async (): Promise<void> => {
     try {
-      // Usar o mesmo endpoint que funciona no CrudProdutos
-      const response = await fetch(`${API_BASE_URL}/produtos-finais/materias-primas-disponiveis`);
+      // Usar endpoint de matérias-primas que retorna dados completos
+      const response = await fetch(`${API_BASE_URL}/materias-primas/public`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      const materias_formatadas = await response.json();
+      const materias: MateriaPrima[] = await response.json();
       
-      // Converter para o formato esperado pelo CrudMateriasPrimas
-      const todasMaterias = materias_formatadas.map((mp: any) => ({
-        id: mp.id,
-        nome: mp.nome,
-        unidade_codigo: mp.unidade,
-        menor_unidade_codigo: mp.unidade,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: null
-      }));
-      
-      
-      setMateriasPrimas(todasMaterias);
-      console.log(`${todasMaterias.length} matérias-primas carregadas com sucesso!`);
+      setMateriasPrimas(materias);
+      console.log(`${materias.length} matérias-primas carregadas com sucesso!`);
     } catch (error) {
       console.error("Erro ao carregar matérias-primas:", error);
+      setMateriasPrimas([]);
     }
   };
 
