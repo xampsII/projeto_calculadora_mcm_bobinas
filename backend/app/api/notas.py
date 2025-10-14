@@ -427,15 +427,21 @@ async def create_nota(
         }
         
     except Exception as e:
-        print(f"ERROR: Erro ao criar nota: {str(e)}")
+        print(f"ERROR: ========================================")
+        print(f"ERROR: FALHA AO CRIAR NOTA FISCAL")
+        print(f"ERROR: ========================================")
         print(f"ERROR: Tipo de erro: {type(e).__name__}")
+        print(f"ERROR: Mensagem: {str(e)}")
+        print(f"ERROR: Dados da nota: Número={nota_data.numero}, Itens={len(nota_data.itens)}")
+        print(f"ERROR: ========================================")
         import traceback
         print(f"ERROR: Traceback completo:")
         traceback.print_exc()
+        print(f"ERROR: ========================================")
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro interno: {str(e)}"
+            detail=f"Erro ao criar nota: {type(e).__name__}: {str(e)}"
         )
 
 
