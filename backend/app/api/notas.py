@@ -280,16 +280,29 @@ async def create_nota(
                 if isinstance(vigente_desde, date) and not isinstance(vigente_desde, datetime):
                     vigente_desde = datetime.combine(vigente_desde, datetime.min.time())
                 
+                # IMPORTANTE: Fechar preço anterior se existir
+                preco_anterior = db.query(MateriaPrimaPreco).filter(
+                    MateriaPrimaPreco.materia_prima_id == materia_prima_id,
+                    MateriaPrimaPreco.vigente_ate.is_(None)  # Preço ainda ativo
+                ).first()
+                
+                if preco_anterior:
+                    preco_anterior.vigente_ate = vigente_desde
+                    db.add(preco_anterior)
+                    print(f"DEBUG: Preço anterior fechado em {vigente_desde}")
+                
+                # Criar novo preço
                 novo_preco = MateriaPrimaPreco(
                     materia_prima_id=materia_prima_id,
                     valor_unitario=item_data.valor_unitario,
                     moeda="BRL",
                     vigente_desde=vigente_desde,
+                    vigente_ate=None,  # Novo preço ativo
                     fornecedor_id=nota_data.fornecedor_id,
                     nota_id=nota.id
                 )
                 db.add(novo_preco)
-                print(f"DEBUG: Preço registrado no histórico: R$ {item_data.valor_unitario}")
+                print(f"DEBUG: Novo preço registrado: R$ {item_data.valor_unitario}")
         
         db.commit()
         db.refresh(nota)
