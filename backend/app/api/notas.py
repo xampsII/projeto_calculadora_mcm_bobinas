@@ -152,7 +152,7 @@ async def get_notas(
 async def get_nota(
     nota_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """Obter uma nota fiscal especÃ­fica"""
     
@@ -345,7 +345,7 @@ async def update_nota(
     nota_id: int,
     nota_data: NotaUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_editor)
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """Atualizar uma nota fiscal"""
     
@@ -368,7 +368,7 @@ async def update_nota(
 async def delete_nota(
     nota_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_editor)
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """Deletar uma nota fiscal"""
     
