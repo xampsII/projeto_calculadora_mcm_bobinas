@@ -7,6 +7,7 @@ class MateriaPrimaCreate(BaseModel):
     nome: str
     unidade_codigo: str
     menor_unidade_codigo: Optional[str] = None
+    preco_inicial: Optional[float] = None
 
 
 class MateriaPrimaUpdate(BaseModel):

@@ -38,6 +38,7 @@ const CrudMateriasPrimas: React.FC = () => {
     unidadeCompra: '',
     unidadeUso: '',
     fatorConversao: '1',
+    precoInicial: '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -50,6 +51,7 @@ const CrudMateriasPrimas: React.FC = () => {
       unidadeCompra: '',
       unidadeUso: '',
       fatorConversao: '1',
+      precoInicial: '',
     });
     setErrors({});
     setShowForm(false);
@@ -66,6 +68,9 @@ const CrudMateriasPrimas: React.FC = () => {
     if (!formData.unidadeUso) newErrors.unidadeUso = 'Unidade de uso é obrigatória';
     if (!formData.fatorConversao || parseFloat(formData.fatorConversao) <= 0) {
       newErrors.fatorConversao = 'Fator de conversão deve ser maior que zero';
+    }
+    if (formData.precoInicial && parseFloat(formData.precoInicial) < 0) {
+      newErrors.precoInicial = 'Preço não pode ser negativo';
     }
 
     setErrors(newErrors);
@@ -87,11 +92,16 @@ const CrudMateriasPrimas: React.FC = () => {
     setLoading(true);
     
     try {
-      const data = {
+      const data: any = {
         nome: formData.nome.trim(),
         unidade_codigo: formData.unidadeCompra,
         menor_unidade_codigo: formData.unidadeUso,
       };
+
+      // Adicionar preço inicial se fornecido
+      if (formData.precoInicial && parseFloat(formData.precoInicial) > 0) {
+        data.preco_inicial = parseFloat(formData.precoInicial);
+      }
 
       let result;
       if (editingId) {
@@ -328,6 +338,41 @@ const CrudMateriasPrimas: React.FC = () => {
                         </div>
                       </div>
                     </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Preço Inicial */}
+              <div className="md:col-span-2">
+                <label htmlFor="precoInicial" className="block text-sm font-medium text-gray-700 mb-2">
+                  Preço Inicial (Opcional)
+                  <span className="text-gray-500 font-normal ml-2">
+                    (Valor unitário em R$/{formData.unidadeCompra || 'unidade de compra'})
+                  </span>
+                </label>
+                <input
+                  type="number"
+                  id="precoInicial"
+                  step="0.01"
+                  min="0"
+                  value={formData.precoInicial}
+                  onChange={(e) => handleInputChange('precoInicial', e.target.value)}
+                  placeholder="Ex: 10.50"
+                  className={`w-full px-3 py-2 bg-white border rounded-lg shadow-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 text-gray-900 placeholder-gray-500 ${
+                    errors.precoInicial ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                />
+                {errors.precoInicial && (
+                  <p className="mt-1 text-sm text-red-600">{errors.precoInicial}</p>
+                )}
+                {formData.precoInicial && parseFloat(formData.precoInicial) > 0 && (
+                  <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-sm text-green-800">
+                    <strong>Preço registrado:</strong> R$ {parseFloat(formData.precoInicial).toFixed(2)}/{formData.unidadeCompra || 'un'}
+                    {formData.fatorConversao && formData.unidadeUso && (
+                      <span className="block text-green-700 mt-1">
+                        = R$ {(parseFloat(formData.precoInicial) / parseFloat(formData.fatorConversao)).toFixed(6)}/{formData.unidadeUso}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>

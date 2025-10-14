@@ -224,12 +224,30 @@ async def create_materia_prima(
         )
         
         db.add(materia_prima)
+        db.flush()  # Para obter o ID
+        
+        # Se foi fornecido um preço inicial, registrar no histórico
+        preco_atual = None
+        if hasattr(materia_prima_data, 'preco_inicial') and materia_prima_data.preco_inicial and materia_prima_data.preco_inicial > 0:
+            from datetime import datetime
+            preco_inicial = MateriaPrimaPreco(
+                materia_prima_id=materia_prima.id,
+                valor_unitario=materia_prima_data.preco_inicial,
+                moeda="BRL",
+                vigente_desde=datetime.now(),
+                vigente_ate=None,  # Preço atual
+                fornecedor_id=None,  # Preço manual
+                nota_id=None
+            )
+            db.add(preco_inicial)
+            preco_atual = materia_prima_data.preco_inicial
+        
         db.commit()
         db.refresh(materia_prima)
         
         return {
             "success": True,
-            "message": "Matéria-prima criada com sucesso!",
+            "message": "Matéria-prima criada com sucesso!" + (" Preço inicial registrado." if preco_atual else ""),
             "data": {
                 "id": materia_prima.id,
                 "nome": materia_prima.nome,
@@ -238,11 +256,11 @@ async def create_materia_prima(
                 "is_active": materia_prima.is_active,
                 "created_at": str(materia_prima.created_at),
                 "updated_at": str(materia_prima.updated_at) if materia_prima.updated_at else None,
-                "preco_atual": None,
+                "preco_atual": preco_atual,
                 "preco_anterior": None,
                 "variacao_abs": None,
                 "variacao_pct": None,
-                "vigente_desde": None
+                "vigente_desde": str(datetime.now()) if preco_atual else None
             }
         }
         
