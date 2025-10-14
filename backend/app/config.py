@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=str(ENV_PATH), extra="ignore")
 
     # URL pronta (opção preferida)
-    DATABASE_URL: Optional[str] = "sqlite:///./backend/nfe_system.db"
+    DATABASE_URL: Optional[str] = "sqlite:///./nfe_system.db"
 
     # Componentes para montar a URL (fallback)
     DB_HOST_POOLER: Optional[str] = None

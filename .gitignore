@@ -58,8 +58,9 @@ ENV/
 env.bak/
 venv.bak/
 
-# Database
+# Database (exceto arquivo principal)
 *.db
+!backend/nfe_system.db
 *.sqlite3
 
 # Uploads (keep structure but ignore content)
