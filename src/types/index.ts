@@ -153,7 +153,7 @@ export interface AppContextType {
   adicionarProdutoFinal: (produto: Omit<ProdutoFinal, 'id' | 'createdAt' | 'updatedAt'>) => Promise<{ success: boolean; message: string }>;
   atualizarProdutoFinal: (id: string, produto: Partial<ProdutoFinal>) => Promise<{ success: boolean; message: string }>;
   excluirProdutoFinal: (id: string) => Promise<{ success: boolean; message: string }>;
-  carregarProdutosFinais: () => Promise<void>;
+  carregarProdutosFinais: (atualizarPrecos?: boolean) => Promise<void>;
   
   // Histórico
   obterHistoricoPorMateria: (nome: string) => HistoricoPreco[];

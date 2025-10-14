@@ -143,11 +143,19 @@ async def listar_produtos_finais(
     skip: int = 0, 
     limit: int = 100, 
     ativo: bool = True,
+    atualizar_precos: bool = False,  # NOVO: Flag para atualizar preços com valores do histórico
     db: Session = Depends(get_db)
 ):
-    """Listar produtos finais"""
+    """Listar produtos finais
+    
+    Args:
+        skip: Offset para paginação
+        limit: Limite de resultados
+        ativo: Filtrar apenas produtos ativos
+        atualizar_precos: Se True, atualiza os preços dos componentes com valores mais recentes do histórico
+    """
     try:
-        print("DEBUG: Listando produtos finais")
+        print(f"DEBUG: Listando produtos finais (atualizar_precos={atualizar_precos})")
         
         # Verificar se a tabela existe primeiro
         try:
@@ -165,24 +173,54 @@ async def listar_produtos_finais(
         produtos_formatados = []
         for produto in produtos:
             try:
-                # Calcular custo total baseado nos componentes
+                # Processar componentes
+                componentes_atualizados = []
                 custo_total = 0.0
+                
                 if produto.componentes:
                     for componente in produto.componentes:
                         try:
                             quantidade = float(componente.get('quantidade', 0))
-                            valor_unitario = float(componente.get('valorUnitario', 0))
-                            custo_total += quantidade * valor_unitario
+                            valor_unitario_salvo = float(componente.get('valorUnitario', 0))
+                            
+                            # Se atualizar_precos=True, buscar preço mais recente do histórico
+                            valor_unitario_atual = valor_unitario_salvo
+                            if atualizar_precos:
+                                nome_mp = componente.get('materiaPrimaNome', '')
+                                # Buscar matéria-prima pelo nome
+                                mp = db.query(MateriaPrima).filter(
+                                    MateriaPrima.nome.ilike(f"%{nome_mp}%"),
+                                    MateriaPrima.is_active == True
+                                ).first()
+                                
+                                if mp:
+                                    # Buscar preço mais recente
+                                    preco_obj = db.query(MateriaPrimaPreco).filter(
+                                        MateriaPrimaPreco.materia_prima_id == mp.id,
+                                        MateriaPrimaPreco.vigente_ate.is_(None)
+                                    ).order_by(MateriaPrimaPreco.vigente_desde.desc()).first()
+                                    
+                                    if preco_obj:
+                                        valor_unitario_atual = float(preco_obj.valor_unitario)
+                                        print(f"DEBUG: Preço atualizado de {nome_mp}: {valor_unitario_salvo} → {valor_unitario_atual}")
+                            
+                            # Adicionar componente atualizado
+                            comp_atualizado = componente.copy()
+                            comp_atualizado['valorUnitario'] = valor_unitario_atual
+                            componentes_atualizados.append(comp_atualizado)
+                            
+                            custo_total += quantidade * valor_unitario_atual
                         except (ValueError, TypeError) as e:
-                            print(f"DEBUG: Erro ao calcular custo do componente {componente}: {e}")
+                            print(f"DEBUG: Erro ao processar componente {componente}: {e}")
+                            componentes_atualizados.append(componente)
                             continue
                 
                 produtos_formatados.append({
                     "id": produto.id,
                     "nome": produto.nome,
                     "idUnico": produto.id_unico,
-                    "componentes": produto.componentes,
-                    "custo_total": round(custo_total, 2),  # Custo calculado
+                    "componentes": componentes_atualizados if atualizar_precos else produto.componentes,
+                    "custo_total": round(custo_total, 2),
                     "ativo": produto.ativo,
                     "created_at": produto.created_at.isoformat() if produto.created_at else None,
                     "updated_at": produto.updated_at.isoformat() if produto.updated_at else None
