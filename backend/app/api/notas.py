@@ -232,18 +232,78 @@ async def create_nota(
         for i, item_data in enumerate(nota_data.itens):
             print(f"DEBUG: Processando item {i+1}: {item_data.nome_no_documento}")
             
-            # Buscar matÃ©ria-prima existente pelo nome
-            nome_limpo = item_data.nome_no_documento.replace('-', '').replace('(', '').replace(')', '').strip()
-            materia_prima = db.query(MateriaPrima).filter(
-                MateriaPrima.nome.ilike(f"%{nome_limpo}%")
-            ).first()
+            # Buscar matéria-prima existente pelo nome (MATCHING MELHORADO)
+            def normalizar_nome(nome: str) -> str:
+                """Normaliza nome para matching mais flexível"""
+                import re
+                # Remover hífens e underscores do início/fim
+                nome = nome.strip('-_').strip()
+                # Remover sufixos comuns de notas fiscais
+                nome = re.sub(r'\s*-\s*inf\s+\w+$', '', nome, flags=re.IGNORECASE)  # Remove "- inf KG"
+                # Remover parênteses MAS manter o conteúdo (ex: (CANTO QUADRADO) -> CANTO QUADRADO)
+                nome = nome.replace('(', ' ').replace(')', ' ')
+                # Converter vírgulas em pontos (ex: 2,0 -> 2.0)
+                nome = nome.replace(',', '.')
+                # Remover espaços ao redor de 'X' (ex: 2.0 X 7.0 -> 2.0X7.0)
+                nome = re.sub(r'\s*X\s*', 'X', nome, flags=re.IGNORECASE)
+                # Remover caracteres especiais mantendo letras, números, pontos e espaços
+                nome = re.sub(r'[^\w\s.]', ' ', nome)
+                # Padronizar espaços múltiplos
+                nome = re.sub(r'\s+', ' ', nome)
+                # Uppercase e trim
+                return nome.upper().strip()
+            
+            nome_nota = normalizar_nome(item_data.nome_no_documento)
+            print(f"DEBUG: Nome normalizado da nota: '{nome_nota}'")
+            
+            # Buscar matéria-prima com matching inteligente
+            materia_prima = None
+            materias_candidatas = db.query(MateriaPrima).filter(
+                MateriaPrima.is_active == True
+            ).all()
+            
+            melhor_match = None
+            melhor_score = 0
+            
+            # Tentar matching exato primeiro
+            for mp in materias_candidatas:
+                nome_mp = normalizar_nome(mp.nome)
+                
+                # Match exato
+                if nome_mp == nome_nota:
+                    materia_prima = mp
+                    print(f"DEBUG: ✅ Match EXATO encontrado: {mp.nome}")
+                    break
+                
+                # Match parcial - calcular score de similaridade
+                palavras_nota = set(nome_nota.split())
+                palavras_mp = set(nome_mp.split())
+                palavras_comuns = palavras_nota & palavras_mp
+                
+                if len(palavras_comuns) >= 2:  # Pelo menos 2 palavras em comum
+                    # Score baseado em: palavras comuns + substring
+                    score = len(palavras_comuns)
+                    if nome_nota in nome_mp or nome_mp in nome_nota:
+                        score += 2
+                    
+                    if score > melhor_score:
+                        melhor_score = score
+                        melhor_match = mp
+            
+            # Se não encontrou match exato, usar o melhor parcial
+            if not materia_prima and melhor_match:
+                materia_prima = melhor_match
+                print(f"DEBUG: ⚠️  Match PARCIAL encontrado: {materia_prima.nome} (score: {melhor_score})")
             
             materia_prima_id = None
             if materia_prima:
                 materia_prima_id = materia_prima.id
-                print(f"DEBUG: MatÃ©ria-prima encontrada: {materia_prima.nome}")
+                print(f"DEBUG: ✅ Matéria-prima vinculada: ID={materia_prima_id}, Nome={materia_prima.nome}")
             else:
-                print(f"DEBUG: MatÃ©ria-prima nÃ£o encontrada para: {item_data.nome_no_documento}")
+                print(f"DEBUG: ❌ Matéria-prima NÃO encontrada para: '{item_data.nome_no_documento}'")
+                print(f"DEBUG: Sugestões de nomes similares no banco:")
+                for mp in materias_candidatas[:5]:
+                    print(f"  - {mp.nome}")
             
             # Verificar se a unidade existe, se nÃ£o, criar automaticamente
             unidade = db.query(Unidade).filter(Unidade.codigo == item_data.unidade_codigo).first()
