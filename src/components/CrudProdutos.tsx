@@ -603,51 +603,9 @@ const CrudProdutos: React.FC = () => {
           </div>
           <div className="flex space-x-3">
             <button
-              onClick={async () => {
-                setLoading(true);
-                try {
-                  // Chamar endpoint que SALVA os preços atualizados no banco
-                  const response = await fetch(`${API_BASE_URL}/produtos-finais/atualizar-precos-todos`, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                  });
-                  
-                  if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                  }
-                  
-                  const result = await response.json();
-                  
-                  // Recarregar produtos para ver os valores salvos
-                  await carregarProdutosFinais();
-                  
-                  setNotification({
-                    message: result.message || 'Preços dos produtos atualizados e salvos com sucesso!',
-                    type: 'success',
-                  });
-                } catch (error) {
-                  console.error('Erro ao atualizar preços:', error);
-                  setNotification({
-                    message: 'Erro ao atualizar preços.',
-                    type: 'error',
-                  });
-                } finally {
-                  setLoading(false);
-                }
-              }}
-              disabled={loading}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium flex items-center space-x-2 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Atualizar preços dos produtos com valores mais recentes do histórico e SALVAR no banco"
-            >
-              <TrendingUp className="h-4 w-4" />
-              <span>{loading ? 'Atualizando...' : 'Recalcular Preços'}</span>
-            </button>
-            <button
               onClick={() => {
                 setShowForm(true);
-                resetCalculator(); // Agora só limpa os dados, não fecha o formulário
+                resetCalculator();
               }}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center space-x-2 transition-all shadow-lg hover:shadow-xl"
             >

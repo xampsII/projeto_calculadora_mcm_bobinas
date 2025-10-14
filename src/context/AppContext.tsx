@@ -306,22 +306,15 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   };
 
-  const carregarProdutosFinais = async (atualizarPrecos: boolean = false): Promise<void> => {
+  const carregarProdutosFinais = async (): Promise<void> => {
     try {
-      const url = atualizarPrecos 
-        ? `${API_BASE_URL}/produtos-finais/?atualizar_precos=true`
-        : `${API_BASE_URL}/produtos-finais/`;
-      
-      const response = await fetch(url);
+      const response = await fetch(`${API_BASE_URL}/produtos-finais/`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const produtos: ProdutoFinal[] = await response.json();
       setProdutosFinais(produtos);
-      
-      if (atualizarPrecos) {
-        console.log('✅ Produtos carregados com preços atualizados do histórico');
-      }
+      console.log('✅ Produtos carregados com preços atualizados automaticamente do histórico');
     } catch (error) {
       console.error("Erro ao carregar produtos finais:", error);
     }

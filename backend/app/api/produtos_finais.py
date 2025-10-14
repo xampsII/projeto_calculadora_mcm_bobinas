@@ -143,19 +143,17 @@ async def listar_produtos_finais(
     skip: int = 0, 
     limit: int = 100, 
     ativo: bool = True,
-    atualizar_precos: bool = False,  # NOVO: Flag para atualizar preços com valores do histórico
     db: Session = Depends(get_db)
 ):
-    """Listar produtos finais
+    """Listar produtos finais com preços SEMPRE atualizados do histórico
     
     Args:
         skip: Offset para paginação
         limit: Limite de resultados
         ativo: Filtrar apenas produtos ativos
-        atualizar_precos: Se True, atualiza os preços dos componentes com valores mais recentes do histórico
     """
     try:
-        print(f"DEBUG: Listando produtos finais (atualizar_precos={atualizar_precos})")
+        print(f"DEBUG: Listando produtos finais com preços atualizados automaticamente")
         
         # Verificar se a tabela existe primeiro
         try:
@@ -183,28 +181,30 @@ async def listar_produtos_finais(
                             quantidade = float(componente.get('quantidade', 0))
                             valor_unitario_salvo = float(componente.get('valorUnitario', 0))
                             
-                            # Se atualizar_precos=True, buscar preço mais recente do histórico
-                            valor_unitario_atual = valor_unitario_salvo
-                            if atualizar_precos:
-                                nome_mp = componente.get('materiaPrimaNome', '')
-                                # Buscar matéria-prima pelo nome
-                                mp = db.query(MateriaPrima).filter(
-                                    MateriaPrima.nome.ilike(f"%{nome_mp}%"),
-                                    MateriaPrima.is_active == True
-                                ).first()
-                                
-                                if mp:
-                                    # Buscar preço mais recente
-                                    preco_obj = db.query(MateriaPrimaPreco).filter(
-                                        MateriaPrimaPreco.materia_prima_id == mp.id,
-                                        MateriaPrimaPreco.vigente_ate.is_(None)
-                                    ).order_by(MateriaPrimaPreco.vigente_desde.desc()).first()
-                                    
-                                    if preco_obj:
-                                        valor_unitario_atual = float(preco_obj.valor_unitario)
-                                        print(f"DEBUG: Preço atualizado de {nome_mp}: {valor_unitario_salvo} → {valor_unitario_atual}")
+                            # SEMPRE buscar preço mais recente do histórico (atualização automática)
+                            nome_mp = componente.get('materiaPrimaNome', '')
                             
-                            # Adicionar componente atualizado
+                            # Buscar matéria-prima pelo nome
+                            mp = db.query(MateriaPrima).filter(
+                                MateriaPrima.nome.ilike(f"%{nome_mp}%"),
+                                MateriaPrima.is_active == True
+                            ).first()
+                            
+                            valor_unitario_atual = valor_unitario_salvo  # Padrão: valor salvo
+                            
+                            if mp:
+                                # Buscar preço mais recente do histórico
+                                preco_obj = db.query(MateriaPrimaPreco).filter(
+                                    MateriaPrimaPreco.materia_prima_id == mp.id,
+                                    MateriaPrimaPreco.vigente_ate.is_(None)
+                                ).order_by(MateriaPrimaPreco.vigente_desde.desc()).first()
+                                
+                                if preco_obj:
+                                    valor_unitario_atual = float(preco_obj.valor_unitario)
+                                    if valor_unitario_atual != valor_unitario_salvo:
+                                        print(f"DEBUG: Preço atualizado automaticamente: {nome_mp}: {valor_unitario_salvo} → {valor_unitario_atual}")
+                            
+                            # Adicionar componente com preço atualizado
                             comp_atualizado = componente.copy()
                             comp_atualizado['valorUnitario'] = valor_unitario_atual
                             componentes_atualizados.append(comp_atualizado)
@@ -219,7 +219,7 @@ async def listar_produtos_finais(
                     "id": produto.id,
                     "nome": produto.nome,
                     "idUnico": produto.id_unico,
-                    "componentes": componentes_atualizados if atualizar_precos else produto.componentes,
+                    "componentes": componentes_atualizados,  # SEMPRE com preços atualizados
                     "custo_total": round(custo_total, 2),
                     "ativo": produto.ativo,
                     "created_at": produto.created_at.isoformat() if produto.created_at else None,
@@ -282,88 +282,6 @@ async def obter_produto_final(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao obter produto final: {str(e)}"
-        )
-
-@produtos_finais_router.post("/atualizar-precos-todos")
-async def atualizar_precos_todos_produtos(
-    db: Session = Depends(get_db)
-):
-    """Atualiza os preços de TODOS os produtos com valores mais recentes do histórico e SALVA no banco"""
-    try:
-        print("DEBUG: Iniciando atualização de preços de todos os produtos...")
-        
-        produtos = db.query(ProdutoFinal).filter(ProdutoFinal.ativo == True).all()
-        total_atualizados = 0
-        total_componentes_atualizados = 0
-        
-        for produto in produtos:
-            if not produto.componentes:
-                continue
-            
-            componentes_atualizados = []
-            houve_atualizacao = False
-            
-            for componente in produto.componentes:
-                nome_mp = componente.get('materiaPrimaNome', '')
-                valor_antigo = float(componente.get('valorUnitario', 0))
-                
-                # Buscar matéria-prima pelo nome
-                mp = db.query(MateriaPrima).filter(
-                    MateriaPrima.nome.ilike(f"%{nome_mp}%"),
-                    MateriaPrima.is_active == True
-                ).first()
-                
-                valor_novo = valor_antigo
-                if mp:
-                    # Buscar preço mais recente
-                    preco_obj = db.query(MateriaPrimaPreco).filter(
-                        MateriaPrimaPreco.materia_prima_id == mp.id,
-                        MateriaPrimaPreco.vigente_ate.is_(None)
-                    ).order_by(MateriaPrimaPreco.vigente_desde.desc()).first()
-                    
-                    if preco_obj:
-                        valor_novo = float(preco_obj.valor_unitario)
-                        if valor_novo != valor_antigo:
-                            houve_atualizacao = True
-                            total_componentes_atualizados += 1
-                            print(f"DEBUG: {produto.nome} - {nome_mp}: R$ {valor_antigo:.4f} → R$ {valor_novo:.4f}")
-                
-                # Criar componente atualizado
-                comp_atualizado = componente.copy()
-                comp_atualizado['valorUnitario'] = valor_novo
-                componentes_atualizados.append(comp_atualizado)
-            
-            # SALVAR no banco se houve atualização
-            if houve_atualizacao:
-                print(f"DEBUG: Salvando produto {produto.id} - {produto.nome}")
-                print(f"DEBUG: Componentes antes: {produto.componentes[:100]}...")
-                produto.componentes = componentes_atualizados
-                print(f"DEBUG: Componentes depois: {componentes_atualizados[:100]}...")
-                # IMPORTANTE: Marcar campo JSON como modificado para SQLAlchemy detectar
-                from sqlalchemy.orm.attributes import flag_modified
-                flag_modified(produto, "componentes")
-                db.add(produto)
-                total_atualizados += 1
-        
-        print(f"DEBUG: Commitando alterações no banco...")
-        db.commit()
-        print(f"DEBUG: ✅ Commit realizado!")
-        
-        print(f"DEBUG: ✅ {total_atualizados} produtos atualizados ({total_componentes_atualizados} componentes)")
-        
-        return {
-            "success": True,
-            "message": f"{total_atualizados} produtos atualizados com {total_componentes_atualizados} componentes alterados",
-            "produtos_atualizados": total_atualizados,
-            "componentes_atualizados": total_componentes_atualizados
-        }
-        
-    except Exception as e:
-        print(f"ERROR: Erro ao atualizar preços: {e}")
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao atualizar preços: {str(e)}"
         )
 
 @produtos_finais_router.put("/{produto_id}")
