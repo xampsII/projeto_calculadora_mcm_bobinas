@@ -6,6 +6,7 @@ from datetime import datetime, date
 import hashlib
 import os
 import logging
+import re
 from lxml import etree
 
 from app.database import get_db
@@ -29,6 +30,33 @@ from app.config import get_settings
 
 # DependÃªncia opcional para DEV
 from fastapi import Request
+
+# Função auxiliar para normalizar nomes de matérias-primas
+def normalizar_nome_materia_prima(nome: str) -> str:
+    """Normaliza nome para matching mais flexível"""
+    if not nome or not isinstance(nome, str):
+        return ""
+    
+    try:
+        # Remover hífens e underscores do início/fim
+        nome = nome.strip('-_').strip()
+        # Remover sufixos comuns de notas fiscais
+        nome = re.sub(r'\s*-\s*inf\s+\w+$', '', nome, flags=re.IGNORECASE)  # Remove "- inf KG"
+        # Remover parênteses MAS manter o conteúdo (ex: (CANTO QUADRADO) -> CANTO QUADRADO)
+        nome = nome.replace('(', ' ').replace(')', ' ')
+        # Converter vírgulas em pontos (ex: 2,0 -> 2.0)
+        nome = nome.replace(',', '.')
+        # Remover espaços ao redor de 'X' (ex: 2.0 X 7.0 -> 2.0X7.0)
+        nome = re.sub(r'\s*X\s*', 'X', nome, flags=re.IGNORECASE)
+        # Remover caracteres especiais mantendo letras, números, pontos e espaços
+        nome = re.sub(r'[^\w\s.]', ' ', nome)
+        # Padronizar espaços múltiplos
+        nome = re.sub(r'\s+', ' ', nome)
+        # Uppercase e trim
+        return nome.upper().strip()
+    except Exception as e:
+        logging.error(f"Erro ao normalizar nome '{nome}': {e}")
+        return nome.upper().strip()
 
 def get_current_user_optional(
     request: Request,
@@ -233,27 +261,7 @@ async def create_nota(
             print(f"DEBUG: Processando item {i+1}: {item_data.nome_no_documento}")
             
             # Buscar matéria-prima existente pelo nome (MATCHING MELHORADO)
-            def normalizar_nome(nome: str) -> str:
-                """Normaliza nome para matching mais flexível"""
-                import re
-                # Remover hífens e underscores do início/fim
-                nome = nome.strip('-_').strip()
-                # Remover sufixos comuns de notas fiscais
-                nome = re.sub(r'\s*-\s*inf\s+\w+$', '', nome, flags=re.IGNORECASE)  # Remove "- inf KG"
-                # Remover parênteses MAS manter o conteúdo (ex: (CANTO QUADRADO) -> CANTO QUADRADO)
-                nome = nome.replace('(', ' ').replace(')', ' ')
-                # Converter vírgulas em pontos (ex: 2,0 -> 2.0)
-                nome = nome.replace(',', '.')
-                # Remover espaços ao redor de 'X' (ex: 2.0 X 7.0 -> 2.0X7.0)
-                nome = re.sub(r'\s*X\s*', 'X', nome, flags=re.IGNORECASE)
-                # Remover caracteres especiais mantendo letras, números, pontos e espaços
-                nome = re.sub(r'[^\w\s.]', ' ', nome)
-                # Padronizar espaços múltiplos
-                nome = re.sub(r'\s+', ' ', nome)
-                # Uppercase e trim
-                return nome.upper().strip()
-            
-            nome_nota = normalizar_nome(item_data.nome_no_documento)
+            nome_nota = normalizar_nome_materia_prima(item_data.nome_no_documento)
             print(f"DEBUG: Nome normalizado da nota: '{nome_nota}'")
             
             # Buscar matéria-prima com matching inteligente
@@ -267,7 +275,7 @@ async def create_nota(
             
             # Tentar matching exato primeiro
             for mp in materias_candidatas:
-                nome_mp = normalizar_nome(mp.nome)
+                nome_mp = normalizar_nome_materia_prima(mp.nome)
                 
                 # Match exato
                 if nome_mp == nome_nota:
