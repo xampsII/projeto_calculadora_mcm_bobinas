@@ -159,6 +159,7 @@ export interface AppContextType {
   obterHistoricoPorMateria: (nome: string) => HistoricoPreco[];
   obterHistoricoPorProduto: (nome: string) => HistoricoProduto[];
   limparHistoricoAntigo: () => void;
+  buscarHistoricoPrecos: () => Promise<any>;
   
   // API Base URL
   API_BASE_URL: string;

@@ -22,16 +22,42 @@ const UNIDADES_BOBINA = [
 ];
 
 const CrudMateriasPrimas: React.FC = () => {
-  const { materiasPrimas, unidadesMedida, adicionarMateriaPrima, atualizarMateriaPrima, excluirMateriaPrima, carregarMateriasPrimas } = useApp();
+  const { materiasPrimas, unidadesMedida, adicionarMateriaPrima, atualizarMateriaPrima, excluirMateriaPrima, carregarMateriasPrimas, buscarHistoricoPrecos } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [historicoPrecos, setHistoricoPrecos] = useState<any>({});
 
-  // Carregar matérias-primas ao montar o componente
+  // Carregar matérias-primas e histórico ao montar o componente
   useEffect(() => {
     carregarMateriasPrimas();
+    carregarHistorico();
   }, [carregarMateriasPrimas]);
+
+  const carregarHistorico = async () => {
+    const historico = await buscarHistoricoPrecos();
+    
+    // Transformar o array em um objeto para acesso rápido por ID
+    const historicoMap: any = {};
+    if (historico && historico.materias_primas) {
+      historico.materias_primas.forEach((mp: any) => {
+        if (mp.historico && mp.historico.length > 0) {
+          const precoAtual = mp.historico[0]; // Mais recente
+          const precoAnterior = mp.historico[1]; // Segundo mais recente
+          
+          historicoMap[mp.materia_prima.id] = {
+            valorAtual: precoAtual.valor_unitario,
+            vigenteSde: precoAtual.vigente_desde,
+            variacao: precoAtual.variacao_percentual || null,
+            valorAnterior: precoAnterior ? precoAnterior.valor_unitario : null
+          };
+        }
+      });
+    }
+    
+    setHistoricoPrecos(historicoMap);
+  };
 
   const [formData, setFormData] = useState({
     nome: '',
@@ -117,6 +143,7 @@ const CrudMateriasPrimas: React.FC = () => {
 
       if (result.success) {
         resetForm();
+        carregarHistorico(); // Recarregar histórico após adicionar/editar
       }
     } catch (error) {
       setNotification({
@@ -459,11 +486,34 @@ const CrudMateriasPrimas: React.FC = () => {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      Aguardando registro
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {historicoPrecos[materia.id] ? (
+                        <div>
+                          <div className="font-medium text-gray-900">
+                            R$ {historicoPrecos[materia.id].valorAtual.toFixed(4).replace('.', ',')}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {new Date(historicoPrecos[materia.id].vigenteSde).toLocaleDateString('pt-BR')}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 italic">Aguardando registro</span>
+                      )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      N/A
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {historicoPrecos[materia.id] && historicoPrecos[materia.id].variacao !== null ? (
+                        <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          historicoPrecos[materia.id].variacao > 0 
+                            ? 'bg-red-100 text-red-800' 
+                            : historicoPrecos[materia.id].variacao < 0 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {historicoPrecos[materia.id].variacao > 0 ? '↑' : '↓'} {Math.abs(historicoPrecos[materia.id].variacao).toFixed(2)}%
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 italic">N/A</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-2">

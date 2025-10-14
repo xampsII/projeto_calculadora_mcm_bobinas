@@ -529,6 +529,21 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       .sort((a, b) => new Date(b.dataCalculo).getTime() - new Date(a.dataCalculo).getTime());
   };
 
+  // Buscar histórico completo de preços de todas as matérias-primas
+  const buscarHistoricoPrecos = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/materias-primas/historico-precos/todos`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error("Erro ao buscar histórico de preços:", error);
+      return { materias_primas: [], total_materias_com_historico: 0 };
+    }
+  };
+
   // Carregar dados iniciais
   useEffect(() => {
     carregarMateriasPrimas();
@@ -574,6 +589,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     obterHistoricoPorMateria,
     obterHistoricoPorProduto,
     limparHistoricoAntigo,
+    buscarHistoricoPrecos,
     
     // API Base URL
     API_BASE_URL,
