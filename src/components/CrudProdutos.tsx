@@ -328,12 +328,15 @@ const CrudProdutos: React.FC = () => {
         if (mp.id === id) {
           const updated = { ...mp };
           
-          // Só permite alterar quantidade (nome e unidade são definidos pela seleção)
+          // Permite alterar quantidade e valorUnitario
           if (field === 'quantidade') {
             updated.quantidade = Number(value) || 0;
             updated.valorTotal = updated.quantidade * updated.valorUnitario;
+          } else if (field === 'valorUnitario') {
+            updated.valorUnitario = Number(value) || 0;
+            updated.valorTotal = updated.quantidade * updated.valorUnitario;
           }
-          // nome, unidade e valorUnitario são definidos pela seleção do produto
+          // nome e unidade são definidos pela seleção do produto
           
           return updated;
         }
@@ -544,19 +547,13 @@ const CrudProdutos: React.FC = () => {
     
     // Preencher o formulário com os dados do produto
     const materiasPrimasEditadas = produto.componentes?.map((comp: any, index: number) => {
-      // Buscar a matéria-prima nas disponíveis para pegar o valor atual
-      const materiaPrimaDisponivel = materiasPrimasDisponiveis.find(
-        mp => mp.nome === (comp.materiaPrimaNome || comp.nome)
-      );
-      
-      // SEMPRE usar o valor das matérias-primas disponíveis, nunca o salvo no componente
-      // Se não encontrar, usar o valor salvo no componente ou um valor mínimo
-      const valorUnitario = materiaPrimaDisponivel?.valorUnitario || comp.valorUnitario || 0.01;
+      // Usar o valor SALVO no componente do produto
+      // Isso permite que o usuário tenha editado manualmente o preço na criação/edição anterior
+      const valorUnitario = comp.valorUnitario || 0.01;
       const quantidade = comp.quantidade || 0;
       
       console.log('Mapeando componente:', {
         nome: comp.materiaPrimaNome || comp.nome,
-        materiaPrimaDisponivel,
         valorUnitario,
         quantidade,
         valorUnitarioSalvo: comp.valorUnitario
@@ -567,7 +564,7 @@ const CrudProdutos: React.FC = () => {
         nome: comp.materiaPrimaNome || comp.nome || '',
         quantidade: quantidade,
         unidade: comp.unidadeMedida || comp.unidade || '',
-        valorUnitario: valorUnitario, // SEMPRE usar o valor atual do banco
+        valorUnitario: valorUnitario, // Usar o valor SALVO no produto (editável)
         valorTotal: quantidade * valorUnitario,
       };
     }) || [];
@@ -821,18 +818,19 @@ const CrudProdutos: React.FC = () => {
                               </div>
                             </td>
                             <td className="px-4 py-2">
-                              <div className="flex items-center space-x-2">
-                                <input
-                                  type="text"
-                                  value={mp.valorUnitario > 0 ? `R$ ${mp.valorUnitario.toFixed(2).replace('.', ',')}` : 'R$ 0,00'}
-                                  readOnly
-                                  className="w-full px-2 py-1 bg-green-50 border border-green-300 rounded-md text-sm text-green-700 font-bold"
-                                  title="Valor unitário do banco de dados"
-                                />
-                                <div className="text-xs text-gray-500 bg-blue-100 px-2 py-1 rounded">
-                                  Fixo
-                                </div>
-                              </div>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={mp.valorUnitario}
+                                onChange={(e) => {
+                                  const novoValor = parseFloat(e.target.value) || 0;
+                                  updateMateriaPrima(mp.id, 'valorUnitario', novoValor);
+                                }}
+                                placeholder="0.00"
+                                className="w-full px-2 py-1 bg-white border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                                title="Valor unitário editável"
+                              />
                             </td>
                             <td className="px-4 py-2">
                               <div className="text-sm font-bold text-blue-700 bg-blue-50 px-2 py-1 rounded border border-blue-200">
