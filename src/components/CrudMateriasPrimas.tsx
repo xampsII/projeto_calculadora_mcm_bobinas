@@ -33,7 +33,8 @@ const CrudMateriasPrimas: React.FC = () => {
   useEffect(() => {
     carregarMateriasPrimas();
     carregarHistorico();
-  }, [carregarMateriasPrimas]);
+  }, []);
+
 
   const carregarHistorico = async () => {
     const historico = await buscarHistoricoPrecos();
