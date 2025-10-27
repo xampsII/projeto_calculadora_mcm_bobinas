@@ -150,41 +150,65 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     }
   };
 
-  const atualizarMateriaPrima = async (id: string, materia: Partial<MateriaPrima>): Promise<{ success: boolean; message: string }> => {
+  const atualizarMateriaPrima = async (
+    id: string,
+    materia: Partial<MateriaPrima>
+  ): Promise<{ success: boolean; message: string }> => {
     try {
+      // Garante que o campo 'menor_unidade_codigo' é enviado
+      if (!materia.menor_unidade_codigo) {
+        console.warn("Campo 'menor_unidade_codigo' ausente — preenchendo automaticamente...");
+        materia.menor_unidade_codigo = materia.unidade_codigo;
+      }
+
       const response = await fetch(`${API_BASE_URL}/materias-primas/${id}`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(materia),
       });
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const msg = await response.text();
+        throw new Error(`HTTP error! status: ${response.status} - ${msg}`);
       }
+
       const data: { success: boolean; message: string } = await response.json();
       return data;
+
     } catch (error) {
       console.error("Erro ao atualizar matéria-prima:", error);
-      return { success: false, message: 'Erro ao atualizar matéria-prima.' };
+      return { success: false, message: "Erro ao atualizar matéria-prima." };
     }
   };
 
-  const excluirMateriaPrima = async (id: string): Promise<{ success: boolean; message: string }> => {
+
+  const excluirMateriaPrima = async (
+    id: string
+  ): Promise<{ success: boolean; message: string }> => {
     try {
       const response = await fetch(`${API_BASE_URL}/materias-primas/${id}`, {
-        method: 'DELETE',
+        method: "DELETE",
       });
+    
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const msg = await response.text();
+        throw new Error(`HTTP error! status: ${response.status} - ${msg}`);
       }
-      const data: { success: boolean; message: string } = await response.json();
-      return data;
+    
+      // DELETE retorna 204 No Content — sem JSON
+      return {
+        success: true,
+        message: "Matéria-prima excluída com sucesso.",
+      };
+    
     } catch (error) {
       console.error("Erro ao excluir matéria-prima:", error);
-      return { success: false, message: 'Erro ao excluir matéria-prima.' };
+      return { success: false, message: "Erro ao excluir matéria-prima." };
     }
   };
+
 
   // CRUD Fornecedores
   const adicionarFornecedor = async (fornecedor: Omit<Fornecedor, 'id' | 'createdAt' | 'updatedAt'>): Promise<{ success: boolean; message: string }> => {
@@ -568,7 +592,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
   const value: AppContextType = {
     // Dados
-    materiasPrimas: materiasPrimas.filter(m => m.ativo),
+    materiasPrimas: materiasPrimas.filter(m => m.is_active),
     fornecedores: fornecedores.filter(f => f.ativo),
     produtosFinais: produtosFinais.filter(p => p.ativo),
     notasFiscais,
