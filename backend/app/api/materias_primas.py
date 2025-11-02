@@ -351,9 +351,9 @@ async def update_materia_prima(
         db.refresh(materia_prima)
         
         # Log de auditoria
-        await log_audit(
+        log_audit(
             db=db,
-            user_id=current_user.id,
+            user=None,  # sem controle de usuário no momento
             entity="materia_prima",
             entity_id=materia_prima.id,
             action="update",
@@ -383,63 +383,107 @@ async def update_materia_prima(
             vigente_desde=str(preco_atual.vigente_desde) if preco_atual and preco_atual.vigente_desde else None
     )
 
-
-@router.delete("/{materia_prima_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{materia_prima_id}")
 async def delete_materia_prima(
     materia_prima_id: int,
     db: Session = Depends(get_db),
-    # current_user: User = Depends(require_editor)  # Removido para simplificar
 ):
-    """Soft delete de uma matéria-prima"""
-    materia_prima = db.query(MateriaPrima).filter(
-        and_(
-            MateriaPrima.id == materia_prima_id,
-            MateriaPrima.is_active == True
+    """
+    Exclui (soft delete) uma matéria-prima, verificando se não está sendo usada
+    em produtos, produtos finais ou notas fiscais.
+    """
+    try:
+        # Verifica se a MP existe
+        materia_prima = (
+            db.query(MateriaPrima)
+            .filter(MateriaPrima.id == materia_prima_id, MateriaPrima.is_active == True)
+            .first()
         )
-    ).first()
-    
-    if not materia_prima:
+        if not materia_prima:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Matéria-prima não encontrada."
+            )
+
+        # Verifica se há vínculos em produtos tradicionais
+        from app.models.produto import ProdutoComponente
+        produtos_using_mp = (
+            db.query(ProdutoComponente)
+            .filter(ProdutoComponente.materia_prima_id == materia_prima_id)
+            .first()
+        )
+        if produtos_using_mp:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Não é possível excluir:materia prima vinculada a produtos."
+            )
+
+        # Verifica se há vínculos em notas fiscais
+        from app.models.nota import NotaItem
+        notas_using_mp = (
+            db.query(NotaItem)
+            .filter(NotaItem.materia_prima_id == materia_prima_id)
+            .first()
+        )
+        if notas_using_mp:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Não é possível excluir: matéria-prima referenciada em notas fiscais."
+            )
+
+        # Verifica se está em uso no JSON de produtos finais
+        from app.models.produto_final import ProdutoFinal
+        produtos_finais = db.query(ProdutoFinal).filter(ProdutoFinal.ativo == True).all()
+
+        usados_em = []
+        for produto in produtos_finais:
+            if not produto.componentes:
+                continue
+            try:
+                for comp in produto.componentes:
+                    # comp é um dicionário JSON: {"id": <materia_prima_id>, "quantidade": ..., ...}
+                    if isinstance(comp, dict) and comp.get("id") == materia_prima_id:
+                        usados_em.append(produto.nome)
+                        break
+            except Exception:
+                continue
+
+        if usados_em:
+            nomes = ", ".join(usados_em)
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Não é possível excluir: esta matéria-prima é utilizada nos produtos finais ({nomes})."
+            )
+        from datetime import datetime
+        materia_prima.is_active = False
+        materia_prima.updated_at = datetime.now()
+        db.commit()
+
+        # Log de auditoria
+        log_audit(
+            db=db,
+            user=None,  # sem controle de usuário no momento
+            entity="materia_prima",
+            entity_id=materia_prima.id,
+            action="delete",
+            changes={"is_active": {"before": True, "after": False}}
+        )
+
+        return {
+            "success": True,
+            "message": "Matéria-prima excluída com sucesso."
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Matéria-prima não encontrada"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao excluir matéria-prima: {str(e)}"
         )
-    
-    # Verificar se há produtos que usam esta MP
-    from app.models.produto import ProdutoComponente
-    produtos_using_mp = db.query(ProdutoComponente).filter(
-        ProdutoComponente.materia_prima_id == materia_prima_id
-    ).first()
-    
-    if produtos_using_mp:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Não é possível excluir matéria-prima que está sendo usada por produtos"
-        )
-    
-    # Verificar se há notas que referenciam esta MP
-    from app.models.nota import NotaItem
-    notas_using_mp = db.query(NotaItem).filter(
-        NotaItem.materia_prima_id == materia_prima_id
-    ).first()
-    
-    if notas_using_mp:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Não é possível excluir matéria-prima que está sendo referenciada por notas"
-        )
-    
-    materia_prima.is_active = False
-    db.commit()
-    
-    # Log de auditoria
-    await log_audit(
-        db=db,
-        user_id=current_user.id,
-        entity="materia_prima",
-        entity_id=materia_prima.id,
-        action="delete",
-        changes={"is_active": {"before": True, "after": False}}
-    )
+
+
 
 
 @router.post("/{materia_prima_id}/precos", response_model=MateriaPrimaPrecoResponse, status_code=status.HTTP_201_CREATED)
@@ -507,9 +551,9 @@ async def create_materia_prima_preco(
     db.refresh(novo_preco)
     
     # Log de auditoria
-    await log_audit(
+    log_audit(
         db=db,
-        user_id=current_user.id,
+        user=None,  # sem controle de usuário no momento
         entity="materia_prima_preco",
         entity_id=novo_preco.id,
         action="create",

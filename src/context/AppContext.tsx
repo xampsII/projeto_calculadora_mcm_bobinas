@@ -184,30 +184,41 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   };
 
 
-  const excluirMateriaPrima = async (
-    id: string
-  ): Promise<{ success: boolean; message: string }> => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/materias-primas/${id}`, {
-        method: "DELETE",
-      });
-    
-      if (!response.ok) {
+const excluirMateriaPrima = async (
+  id: string
+): Promise<{ success: boolean; message: string }> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/materias-primas/${id}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      // tenta pegar o JSON de erro do backend
+      let errorMessage = "Erro ao excluir matéria-prima.";
+      try {
+        const data = await response.json();
+        if (data?.detail) errorMessage = data.detail;
+      } catch {
+        // fallback caso o backend não retorne JSON
         const msg = await response.text();
-        throw new Error(`HTTP error! status: ${response.status} - ${msg}`);
+        if (msg) errorMessage = msg;
       }
-    
-      // DELETE retorna 204 No Content — sem JSON
-      return {
-        success: true,
-        message: "Matéria-prima excluída com sucesso.",
-      };
-    
-    } catch (error) {
-      console.error("Erro ao excluir matéria-prima:", error);
-      return { success: false, message: "Erro ao excluir matéria-prima." };
+
+      return { success: false, message: errorMessage };
     }
-  };
+
+    // DELETE normalmente retorna 204 sem corpo
+    return {
+      success: true,
+      message: "Matéria-prima excluída com sucesso.",
+    };
+
+  } catch (error) {
+    console.error("Erro ao excluir matéria-prima:", error);
+    return { success: false, message: "Erro ao excluir matéria-prima." };
+  }
+};
+
 
 
   // CRUD Fornecedores

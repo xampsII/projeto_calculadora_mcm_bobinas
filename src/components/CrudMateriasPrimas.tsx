@@ -167,25 +167,53 @@ const CrudMateriasPrimas: React.FC = () => {
     setShowForm(true);
   };
 
-  const handleDelete = async (id: string, nome: string) => {
-    if (!confirm(`Tem certeza que deseja excluir "${nome}"?`)) return;
+const handleDelete = async (id: string, nome: string) => {
+  if (!confirm(`Tem certeza que deseja excluir "${nome}"?`)) return;
 
-    setLoading(true);
-    try {
-      const result = await excluirMateriaPrima(id);
+  setLoading(true);
+  try {
+    const result = await excluirMateriaPrima(id);
+
+    if (result.success) {
       setNotification({
-        message: result.message,
-        type: result.success ? 'success' : 'error',
+        message: 'Matéria-prima excluída com sucesso.',
+        type: 'success',
       });
-    } catch (error) {
+
+      carregarMateriasPrimas();
+      carregarHistorico();
+    } else {
       setNotification({
-        message: 'Erro ao excluir matéria-prima.',
+        message: result.message || 'Erro ao excluir matéria-prima.',
         type: 'error',
       });
-    } finally {
-      setLoading(false);
     }
-  };
+  } catch (error: any) {
+    // Trata mensagens personalizadas do backend (ex: "matéria-prima em uso")
+    let errorMessage = 'Erro ao excluir matéria-prima.';
+
+    try {
+      const errData = await error.response?.json?.();
+      if (errData?.detail) {
+        errorMessage = errData.detail;
+      } else if (typeof error === 'object' && error.message) {
+        errorMessage = error.message;
+      }
+    } catch {
+      // fallback silencioso
+    }
+
+    setNotification({
+      message: errorMessage,
+      type: 'error',
+    });
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
 
   return (
     <div className="space-y-6">
@@ -359,10 +387,10 @@ const CrudMateriasPrimas: React.FC = () => {
                           <strong>Conversão:</strong> 1 {formData.unidadeCompra} = {formData.fatorConversao} {formData.unidadeUso}
                         </div>
                         <div className="text-red-700">
-                          💡 <strong>Exemplo:</strong> Se comprar por R$ 10,00/{formData.unidadeCompra}, o custo será <strong>R$ {(10 / parseFloat(formData.fatorConversao || '1')).toFixed(6)}/{formData.unidadeUso}</strong>
+                           <strong>Exemplo:</strong> Se comprar por R$ 10,00/{formData.unidadeCompra}, o custo será <strong>R$ {(10 / parseFloat(formData.fatorConversao || '1')).toFixed(6)}/{formData.unidadeUso}</strong>
                         </div>
                         <div className="text-red-600 text-xs">
-                          ✅ Sempre use a <strong>menor unidade de medida</strong> para controle preciso de custos
+                           Sempre use a <strong>menor unidade de medida</strong> para controle preciso de custos
                         </div>
                       </div>
                     </div>

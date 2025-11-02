@@ -16,7 +16,7 @@ def log_audit(
 ) -> None:
     """Registra uma entrada de auditoria"""
     audit_log = AuditLog(
-        user_id=user.id,
+        user_id=user.id if user else None,
         entity=entity,
         entity_id=entity_id,
         action=action,
