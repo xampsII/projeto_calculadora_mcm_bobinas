@@ -2,6 +2,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import String, Integer, Boolean, Float, DateTime, ForeignKey, Numeric
 from app.models.base import Base
 from typing import Optional
+from datetime import datetime
 
 
 class MateriaPrima(Base):
@@ -12,7 +13,7 @@ class MateriaPrima(Base):
     unidade_codigo: Mapped[str] = mapped_column(String(10), ForeignKey("unidades.codigo"), nullable=False)
     menor_unidade_codigo: Mapped[Optional[str]] = mapped_column(String(10), ForeignKey("unidades.codigo"), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default="now()")
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), default=datetime.now)
     updated_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), server_default="now()", onupdate="now()", nullable=True)
     
     # Relationships
@@ -40,7 +41,7 @@ class MateriaPrimaPreco(Base):
     fornecedor_id: Mapped[int | None] = mapped_column(ForeignKey("fornecedor.id_fornecedor"), nullable=True)
     nota_id: Mapped[int | None] = mapped_column(ForeignKey("notas.id"), nullable=True)
     # observacao: Mapped[str | None] = mapped_column(String(500), nullable=True)  # Coluna não existe no banco
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default="now()")
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), default=datetime.now)
     
     # Relationships
     materia_prima: Mapped["MateriaPrima"] = relationship("MateriaPrima", back_populates="precos")
