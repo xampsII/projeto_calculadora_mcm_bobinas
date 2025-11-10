@@ -11,9 +11,12 @@
     "dev:all": "concurrently \"cd backend && python -m uvicorn app.main:app --reload\" \"npm run dev\""
   },
   "dependencies": {
+    "@types/file-saver": "^2.0.7",
+    "file-saver": "^2.0.5",
     "lucide-react": "^0.344.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",

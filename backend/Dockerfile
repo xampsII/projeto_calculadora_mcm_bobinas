@@ -11,6 +11,8 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     curl \
     bash \
+    && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Copiar requirements primeiro (para cache do Docker)

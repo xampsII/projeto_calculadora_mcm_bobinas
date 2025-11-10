@@ -16,6 +16,7 @@
     volumes:
       - ./backend/uploads:/app/uploads
       - ./backend/nfe_system.db:/app/nfe_system.db
+      - ./mcp-server-pdf:/app/mcp-server-pdf
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     restart: unless-stopped
     networks:

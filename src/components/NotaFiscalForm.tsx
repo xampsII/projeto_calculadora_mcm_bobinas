@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Save, Upload, Loader2, Plus, Trash2, Download, Bot } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { NotaFiscal, NotaFiscalItem } from '../types';
@@ -50,6 +50,10 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
   const [showIA, setShowIA] = useState(false);
   const [fileForIA, setFileForIA] = useState<File | null>(null);
 
+  type FormItem = NotaFiscalItem & {
+    valorUnitarioTexto?: string;
+  };
+
   const [formData, setFormData] = useState({
     numeroNota: '',
     fornecedorNome: '',
@@ -64,14 +68,202 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
       menorUnidadeUso: '',
       quantidade: 0, 
       valorUnitario: 0, 
-      valorTotal: 0 
-    }] as NotaFiscalItem[],
+      valorTotal: 0,
+      valorUnitarioTexto: ''
+    }] as FormItem[],
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  type PreviewItem = {
+    id: string;
+    descricao: string;
+    unidade: string;
+    quantidade: number;
+    valorUnitario: number;
+    valorTotal: number;
+    valorUnitarioTexto?: string;
+  };
+
+  const mapItensParaPreview = (itens: any[] = []): PreviewItem[] => {
+    return itens.map((item, index) => {
+      const quantidade = parseNumber(item?.quantidade ?? item?.qty ?? item?.qtd);
+      const valorUnitario = parseNumber(item?.valor_unitario ?? item?.valorUnitario ?? item?.unit_price);
+      const valorTotal =
+        parseNumber(item?.valor_total ?? item?.valorTotal ?? item?.amount ?? item?.total) ||
+        Number((quantidade * valorUnitario).toFixed(2));
+
+      const quantidadeTexto =
+        item?.quantidade_texto ||
+        item?.quantidadeTexto ||
+        (Number.isFinite(quantidade) && quantidade !== 0 ? quantidade.toString().replace('.', ',') : '');
+      const valorUnitarioTexto =
+        item?.valor_unitario_texto ||
+        item?.valorUnitarioTexto ||
+        (Number.isFinite(valorUnitario) && valorUnitario !== 0 ? valorUnitario.toString().replace('.', ',') : '');
+      const valorTotalTexto =
+        item?.valor_total_texto ||
+        item?.valorTotalTexto ||
+        (Number.isFinite(valorTotal) && valorTotal !== 0 ? valorTotal.toString().replace('.', ',') : '');
+
+      return {
+        id: item?.id ? String(item.id) : `ia-${Date.now()}-${index}`,
+        descricao: item?.descricao || item?.materia_prima || '',
+        unidade: (item?.unidade || item?.un || item?.unidadeMedida || '').toString(),
+        quantidade,
+        quantidadeTexto,
+        valorUnitario,
+        valorUnitarioTexto,
+        valorTotal,
+        valorTotalTexto,
+      };
+    });
+  };
+
+  const abrirPreviewIA = (payload: any, sessionId?: string) => {
+    const itensPreview = mapItensParaPreview(payload?.itens);
+
+    if (!itensPreview.length) {
+      setNotification({
+        message: 'IA não retornou itens para pré-visualização.',
+        type: 'error',
+      });
+      return;
+    }
+
+    setIaPreviewItems(itensPreview);
+    setIaPreviewSelection(
+      itensPreview.reduce<Record<string, boolean>>((acc, item) => {
+        acc[item.id] = true;
+        return acc;
+      }, {}),
+    );
+
+    setIaPreviewMeta({
+      numeroNota: payload?.numero_nota,
+      fornecedor: payload?.fornecedor,
+      cnpj: payload?.cnpj_fornecedor,
+      endereco: payload?.endereco,
+      dataEmissao: payload?.data_emissao,
+      valorTotal: parseNumber(payload?.valor_total),
+      sessionId,
+      raw: payload,
+    });
+
+    setIaPreviewOpen(true);
+  };
+
+  const fecharPreviewIA = () => {
+    setIaPreviewOpen(false);
+  };
+
+  const atualizarItemPreview = (index: number, campo: keyof PreviewItem, valor: string) => {
+    setIaPreviewItems((prev) => {
+      const updated = [...prev];
+      const item = { ...updated[index] };
+
+      const setNumero = (texto: string) => {
+        const numero = parseNumber(texto);
+        return { numero, texto };
+      };
+
+      if (campo === 'descricao' || campo === 'unidade') {
+        item[campo] = valor;
+      } else if (campo === 'quantidade') {
+        const { numero, texto } = setNumero(valor);
+        item.quantidade = numero;
+        item.quantidadeTexto = texto;
+        item.valorTotal = Number((item.quantidade * item.valorUnitario).toFixed(2));
+        item.valorTotalTexto =
+          item.valorTotal !== 0 ? item.valorTotal.toString().replace('.', ',') : item.valorTotalTexto;
+      } else if (campo === 'valorUnitario') {
+        const { numero, texto } = setNumero(valor);
+        item.valorUnitario = numero;
+        item.valorUnitarioTexto = texto;
+        item.valorTotal = Number((item.quantidade * item.valorUnitario).toFixed(2));
+        item.valorTotalTexto =
+          item.valorTotal !== 0 ? item.valorTotal.toString().replace('.', ',') : item.valorTotalTexto;
+      } else if (campo === 'valorTotal') {
+        const { numero, texto } = setNumero(valor);
+        item.valorTotal = numero;
+        item.valorTotalTexto = texto;
+      }
+
+      updated[index] = item;
+      return updated;
+    });
+  };
+
+  const toggleSelecaoPreview = (id: string) => {
+    setIaPreviewSelection((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  };
+
+  const selecionarTodosPreview = (valor: boolean) => {
+    setIaPreviewSelection(
+      iaPreviewItems.reduce<Record<string, boolean>>((acc, item) => {
+        acc[item.id] = valor;
+        return acc;
+      }, {}),
+    );
+  };
+
+  const aplicarItensSelecionados = () => {
+    const selecionados = iaPreviewItems.filter((item) => iaPreviewSelection[item.id]);
+
+    if (!selecionados.length) {
+      setNotification({
+        message: 'Selecione pelo menos um item para aplicar.',
+        type: 'error',
+      });
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      numeroNota: iaPreviewMeta?.numeroNota || prev.numeroNota,
+      fornecedorNome: iaPreviewMeta?.fornecedor || prev.fornecedorNome,
+      cnpjFornecedor: iaPreviewMeta?.cnpj || prev.cnpjFornecedor,
+      enderecoFornecedor: iaPreviewMeta?.endereco || prev.enderecoFornecedor,
+      dataEmissao: iaPreviewMeta?.dataEmissao || prev.dataEmissao,
+      itens: selecionados.map((item, index) => ({
+        id: `${item.id}-${index}`,
+        materiaPrimaNome: item.descricao,
+        unidadeMedida: item.unidade || '',
+        menorUnidadeUso: item.unidade || '',
+        quantidade: Number(item.quantidade.toFixed(4)),
+        valorUnitario: Number(item.valorUnitario.toFixed(2)),
+        valorUnitarioTexto:
+          item.valorUnitarioTexto ??
+          (item.valorUnitario !== 0 ? item.valorUnitario.toString().replace('.', ',') : ''),
+        valorTotal: Number(item.valorTotal.toFixed(2)),
+      })),
+    }));
+
+    setIaPreviewOpen(false);
+    setNotification({
+      message: 'Itens aplicados com sucesso. Revise antes de salvar.',
+      type: 'success',
+    });
+  };
+  const [iaPreviewOpen, setIaPreviewOpen] = useState(false);
+  const [iaPreviewItems, setIaPreviewItems] = useState<PreviewItem[]>([]);
+  const [iaPreviewSelection, setIaPreviewSelection] = useState<Record<string, boolean>>({});
+  const [iaPreviewMeta, setIaPreviewMeta] = useState<{
+    numeroNota?: string;
+    fornecedor?: string;
+    cnpj?: string;
+    endereco?: string;
+    dataEmissao?: string;
+    valorTotal?: number;
+    sessionId?: string;
+    raw?: any;
+  } | null>(null);
+
   // Carregar nota para edição
-  React.useEffect(() => {
+  useEffect(() => {
     if (notaId) {
       loadNota();
     }
@@ -91,7 +283,12 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
           enderecoFornecedor: nota.enderecoFornecedor || '',
           dataEmissao: nota.dataEmissao,
           observacoes: nota.observacoes || '',
-          itens: nota.itens,
+      itens: nota.itens.map(item => ({
+        ...item,
+        valorUnitarioTexto: item.valorUnitario !== undefined && item.valorUnitario !== null
+          ? item.valorUnitario.toString().replace('.', ',')
+          : ''
+      })) as FormItem[],
         });
       }
     } catch (error) {
@@ -130,6 +327,16 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
     return Object.keys(newErrors).length === 0;
   };
 
+  const parseNumber = (value: any): number => {
+    if (typeof value === 'number' && !Number.isNaN(value)) return value;
+    if (typeof value === 'string') {
+      const cleaned = value.replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.');
+      const parsed = Number(cleaned);
+      return Number.isNaN(parsed) ? 0 : parsed;
+    }
+    return 0;
+  };
+
   const handleInputChange = (field: string, value: string) => {
     if (field === 'cnpjFornecedor') {
       value = formatCNPJ(value);
@@ -146,15 +353,29 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
     
     // Formatar valor unitário para 2 casas decimais
     if (field === 'valorUnitario') {
-      const numValue = Number(value);
-      newItems[index] = { ...newItems[index], [field]: Number(numValue.toFixed(2)) };
+      const inputStr = typeof value === 'string' ? value : value.toString();
+      const numValue = parseNumber(inputStr);
+      newItems[index] = { 
+        ...newItems[index], 
+        valorUnitario: Number(numValue.toFixed(2)),
+        valorUnitarioTexto: inputStr
+      };
+    } else if (field === 'unidadeMedida') {
+      const unidade = typeof value === 'string' ? value : String(value);
+      newItems[index] = {
+        ...newItems[index],
+        unidadeMedida: unidade,
+        menorUnidadeUso: unidade || ''
+      };
     } else {
-      newItems[index] = { ...newItems[index], [field]: field === 'quantidade' ? Number(value) : value };
+      newItems[index] = { ...newItems[index], [field]: field === 'quantidade' ? parseNumber(value) : value };
     }
 
     // Calculate valorTotal for the item
-    const qty = newItems[index].quantidade;
-    const unitValue = newItems[index].valorUnitario;
+    const qty = parseNumber(newItems[index].quantidade);
+    newItems[index].quantidade = qty;
+    const unitValue = parseNumber(newItems[index].valorUnitario);
+    newItems[index].valorUnitario = unitValue;
     newItems[index].valorTotal = (qty > 0 && unitValue > 0) ? Number((qty * unitValue).toFixed(2)) : 0;
 
     setFormData((prev) => ({ ...prev, itens: newItems }));
@@ -172,7 +393,8 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
         unidadeMedida: '', 
         quantidade: 0, 
         valorUnitario: 0, 
-        valorTotal: 0 
+        valorTotal: 0,
+        valorUnitarioTexto: ''
       }],
     }));
   };
@@ -262,7 +484,8 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
               unidadeMedida: '', 
               quantidade: 0, 
               valorUnitario: 0, 
-              valorTotal: 0 
+              valorTotal: 0,
+              valorUnitarioTexto: ''
             }],
           });
         }
@@ -296,15 +519,21 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
       if (result.success && result.dados_extraidos) {
         // Preencher o formulário com os dados extraídos do XML
         setFormData(prev => {
-          const novosItens = result.dados_extraidos.itens ? result.dados_extraidos.itens.map((item: any, index: number) => ({
-            id: `pdf-${index}`,
-            materiaPrimaNome: item.descricao || '',
-            unidadeMedida: item.un || '',  // Mapear diretamente a unidade do PDF
-            menorUnidadeUso: item.un || '',  // Mostrar a unidade na coluna Menor Unidade
-            quantidade: item.quantidade || 0,
-            valorUnitario: Number((item.valor_unitario || 0).toFixed(2)),
-            valorTotal: Number((item.valor_total || 0).toFixed(2)),
-          })) : prev.itens;
+          const novosItens = result.dados_extraidos.itens ? result.dados_extraidos.itens.map((item: any, index: number) => {
+            const quantidade = parseNumber(item.quantidade);
+            const valorUnitario = parseNumber(item.valor_unitario);
+            const valorTotal = parseNumber(item.valor_total) || Number((quantidade * valorUnitario).toFixed(2));
+            return {
+              id: `pdf-${index}`,
+              materiaPrimaNome: item.descricao || '',
+              unidadeMedida: item.un || '',
+              menorUnidadeUso: item.un || '',
+              quantidade,
+              valorUnitario,
+              valorUnitarioTexto: item.valor_unitario !== undefined ? String(item.valor_unitario).replace('.', ',') : '',
+              valorTotal,
+            };
+          }) : prev.itens;
 
           return {
             ...prev,
@@ -342,37 +571,7 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
   };
 
   const handleIASuccess = (data: any) => {
-    console.log('=== HANDLE IA SUCCESS ===');
-    console.log('Dados recebidos:', data);
-    console.log('=== FIM HANDLE IA SUCCESS ===');
-    
-    setFormData(prev => {
-      const novosItens = data.itens ? data.itens.map((item: any, index: number) => ({
-        id: `ai-${index}`,
-        materiaPrimaNome: item.descricao || item.materia_prima || '',
-        unidadeMedida: item.unidade || item.un || '',
-        menorUnidadeUso: item.unidade || item.un || '',
-        quantidade: item.quantidade || 0,
-        valorUnitario: Number((item.valor_unitario || item.valorUnitario || 0).toFixed(2)),
-        valorTotal: Number((item.valor_total || item.valorTotal || 0).toFixed(2)),
-      })) : prev.itens;
-
-      return {
-        ...prev,
-        numeroNota: data.numero_nota || prev.numeroNota,
-        fornecedorNome: data.fornecedor || prev.fornecedorNome,
-        cnpjFornecedor: data.cnpj_fornecedor || prev.cnpjFornecedor,
-        enderecoFornecedor: data.endereco || prev.enderecoFornecedor,
-        dataEmissao: data.data_emissao || prev.dataEmissao,
-        valorTotal: data.valor_total || prev.valorTotal,
-        itens: novosItens,
-      };
-    });
-    
-    console.log('=== FORM DATA ATUALIZADO ===');
-    console.log('Novos dados aplicados ao formulário');
-    console.log('=== FIM FORM DATA ===');
-    
+    abrirPreviewIA(data);
     setShowIA(false);
     setFileForIA(null);
   };
@@ -393,32 +592,9 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
       const result = await response.json();
       
       if (result.success && result.dados_extraidos) {
-        // Preencher os campos com os dados extraídos pela IA
-        setFormData(prev => {
-          const novosItens = result.dados_extraidos.itens ? result.dados_extraidos.itens.map((item: any, index: number) => ({
-            id: `ai-${index}`,
-            materiaPrimaNome: item.descricao || item.materia_prima || '',
-            unidadeMedida: item.unidade || item.un || '',
-            menorUnidadeUso: item.unidade || item.un || '',
-            quantidade: item.quantidade || 0,
-            valorUnitario: Number((item.valor_unitario || item.valorUnitario || 0).toFixed(2)),
-            valorTotal: Number((item.valor_total || item.valorTotal || 0).toFixed(2)),
-          })) : prev.itens;
-
-          return {
-            ...prev,
-            numeroNota: result.dados_extraidos.numero_nota || prev.numeroNota,
-            fornecedorNome: result.dados_extraidos.fornecedor || prev.fornecedorNome,
-            cnpjFornecedor: result.dados_extraidos.cnpj_fornecedor || prev.cnpjFornecedor,
-            enderecoFornecedor: result.dados_extraidos.endereco || prev.enderecoFornecedor,
-            dataEmissao: result.dados_extraidos.data_emissao || prev.dataEmissao,
-            valorTotal: result.dados_extraidos.valor_total || prev.valorTotal,
-            itens: novosItens,
-          };
-        });
-        
+        abrirPreviewIA(result.dados_extraidos, result.session_id);
         setNotification({
-          message: 'PDF processado com IA! Revise os dados extraídos.',
+          message: result.message ?? 'PDF processado com IA! Revise os dados extraídos.',
           type: 'success',
         });
         setUploadMethod(null);
@@ -469,32 +645,9 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
       const result = await response.json();
       
       if (result.success && result.dados_extraidos) {
-        // Preencher os campos com os dados extraídos pela IA
-        setFormData(prev => {
-          const novosItens = result.dados_extraidos.itens ? result.dados_extraidos.itens.map((item: any, index: number) => ({
-            id: `ai-${index}`,
-            materiaPrimaNome: item.descricao || item.materia_prima || '',
-            unidadeMedida: item.unidade || item.un || '',
-            menorUnidadeUso: item.unidade || item.un || '',
-            quantidade: item.quantidade || 0,
-            valorUnitario: Number((item.valor_unitario || item.valorUnitario || 0).toFixed(2)),
-            valorTotal: Number((item.valor_total || item.valorTotal || 0).toFixed(2)),
-          })) : prev.itens;
-
-          return {
-            ...prev,
-            numeroNota: result.dados_extraidos.numero_nota || prev.numeroNota,
-            fornecedorNome: result.dados_extraidos.fornecedor || prev.fornecedorNome,
-            cnpjFornecedor: result.dados_extraidos.cnpj_fornecedor || prev.cnpjFornecedor,
-            enderecoFornecedor: result.dados_extraidos.endereco || prev.enderecoFornecedor,
-            dataEmissao: result.dados_extraidos.data_emissao || prev.dataEmissao,
-            valorTotal: result.dados_extraidos.valor_total || prev.valorTotal,
-            itens: novosItens,
-          };
-        });
-        
+        abrirPreviewIA(result.dados_extraidos, result.session_id);
         setNotification({
-          message: 'PDF processado com IA! Revise os dados extraídos.',
+          message: result.message ?? 'PDF processado com IA! Revise os dados extraídos.',
           type: 'success',
         });
       } else {
@@ -867,12 +1020,15 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
                       </td>
                       <td className="p-2">
                         <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={item.valorUnitario.toFixed(2)}
+                          type="text"
+                          inputMode="decimal"
+                          value={
+                            item.valorUnitarioTexto !== undefined
+                              ? item.valorUnitarioTexto
+                              : item.valorUnitario.toFixed(2).replace('.', ',')
+                          }
                           onChange={(e) => handleItemChange(index, 'valorUnitario', e.target.value)}
-                          placeholder="0.00"
+                          placeholder="0,00"
                           className={`w-full px-2 py-1 bg-white border rounded-md shadow-sm focus:ring-1 focus:ring-red-500 focus:border-red-500 text-sm text-gray-900 placeholder-gray-500 ${
                             errors[`item-${index}-valorUnitario`] ? 'border-red-500' : 'border-gray-300'
                           }`}
@@ -1000,6 +1156,170 @@ const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({ notaId, onVoltar, onSal
             setFileForIA(null);
           }}
         />
+      )}
+      {iaPreviewOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-5xl bg-white rounded-lg shadow-xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Pré-visualização dos itens extraídos</h3>
+                <p className="text-sm text-gray-600">
+                  Revise, ajuste e selecione os itens antes de importar para a nota fiscal.
+                </p>
+              </div>
+              <button
+                onClick={fecharPreviewIA}
+                className="text-gray-500 hover:text-gray-800 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="px-6 py-4 border-b grid grid-cols-1 md:grid-cols-3 gap-3 text-sm text-gray-700">
+              <div>
+                <span className="font-medium text-gray-900">Número NF:</span>{' '}
+                {iaPreviewMeta?.numeroNota || '—'}
+              </div>
+              <div>
+                <span className="font-medium text-gray-900">Fornecedor:</span>{' '}
+                {iaPreviewMeta?.fornecedor || '—'}
+              </div>
+              <div>
+                <span className="font-medium text-gray-900">Data emissão:</span>{' '}
+                {iaPreviewMeta?.dataEmissao || '—'}
+              </div>
+              <div>
+                <span className="font-medium text-gray-900">CNPJ:</span>{' '}
+                {iaPreviewMeta?.cnpj || '—'}
+              </div>
+              <div className="md:col-span-2">
+                <span className="font-medium text-gray-900">Endereço:</span>{' '}
+                {iaPreviewMeta?.endereco || '—'}
+              </div>
+            </div>
+
+            <div className="px-6 py-4">
+              <div className="flex items-center justify-between mb-3 text-sm">
+                <span className="text-gray-600">
+                  {Object.values(iaPreviewSelection).filter(Boolean).length} de {iaPreviewItems.length} itens selecionados
+                </span>
+                <div className="space-x-2">
+                  <button
+                    onClick={() => selecionarTodosPreview(true)}
+                    className="px-3 py-1 rounded-md border border-gray-300 hover:bg-gray-100 transition-colors"
+                  >
+                    Selecionar todos
+                  </button>
+                  <button
+                    onClick={() => selecionarTodosPreview(false)}
+                    className="px-3 py-1 rounded-md border border-gray-300 hover:bg-gray-100 transition-colors"
+                  >
+                    Limpar seleção
+                  </button>
+                </div>
+              </div>
+
+              <div className="max-h-96 overflow-y-auto border border-gray-200 rounded-lg">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2"></th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-600">Descrição</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-600">Unidade</th>
+                      <th className="px-3 py-2 text-right font-semibold text-gray-600">Quantidade</th>
+                      <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor Unitário (R$)</th>
+                      <th className="px-3 py-2 text-right font-semibold text-gray-600">Valor Total (R$)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {iaPreviewItems.map((item, index) => (
+                      <tr key={item.id} className={!iaPreviewSelection[item.id] ? 'bg-gray-50' : ''}>
+                        <td className="px-3 py-2">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 text-red-600 rounded border-gray-300 focus:ring-red-500"
+                            checked={Boolean(iaPreviewSelection[item.id])}
+                            onChange={() => toggleSelecaoPreview(item.id)}
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="text"
+                            value={item.descricao}
+                            onChange={(e) => atualizarItemPreview(index, 'descricao', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-1 focus:ring-red-500 focus:border-red-500"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="text"
+                            value={item.unidade}
+                            onChange={(e) => atualizarItemPreview(index, 'unidade', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-1 focus:ring-red-500 focus:border-red-500"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={
+                              item.quantidadeTexto !== undefined
+                                ? item.quantidadeTexto
+                                : item.quantidade.toString().replace('.', ',')
+                            }
+                            onChange={(e) => atualizarItemPreview(index, 'quantidade', e.target.value)}
+                            className="w-full text-right px-2 py-1 border border-gray-300 rounded-md focus:ring-1 focus:ring-red-500 focus:border-red-500"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={
+                              item.valorUnitarioTexto !== undefined
+                                ? item.valorUnitarioTexto
+                                : item.valorUnitario.toString().replace('.', ',')
+                            }
+                            onChange={(e) => atualizarItemPreview(index, 'valorUnitario', e.target.value)}
+                            className="w-full text-right px-2 py-1 border border-gray-300 rounded-md focus:ring-1 focus:ring-red-500 focus:border-red-500"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={
+                              item.valorTotalTexto !== undefined
+                                ? item.valorTotalTexto
+                                : item.valorTotal.toString().replace('.', ',')
+                            }
+                            onChange={(e) => atualizarItemPreview(index, 'valorTotal', e.target.value)}
+                            className="w-full text-right px-2 py-1 border border-gray-300 rounded-md focus:ring-1 focus:ring-red-500 focus:border-red-500"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t bg-gray-50 flex items-center justify-between">
+              <button
+                onClick={fecharPreviewIA}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={aplicarItensSelecionados}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-md shadow-sm transition-colors"
+              >
+                Aplicar itens selecionados
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

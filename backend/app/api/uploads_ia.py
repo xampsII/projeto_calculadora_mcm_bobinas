@@ -1,174 +1,238 @@
 ﻿# -*- coding: utf-8 -*-
-from fastapi import APIRouter, UploadFile, File, HTTPException
-import subprocess
+from __future__ import annotations
+
 import json
-import tempfile
 import os
 import re
-from typing import Dict, List
+import subprocess
+import tempfile
+import uuid
+from pathlib import Path
+from typing import Dict, Optional
+
+from fastapi import APIRouter, File, HTTPException, UploadFile
+from pydantic import BaseModel
 from unidecode import unidecode
+
+from app.config import settings
+from app.services.docai_client import process_invoice_pdf
+from app.services.nfe_parser import parse_invoice_document
 
 router = APIRouter(prefix="/uploads-ia", tags=["uploads-ia"])
 
-async def processar_pdf_com_ia(content: bytes, filename: str) -> dict:
-    """Processa PDF usando MCP + IA quando o parser normal falha"""
-    print("\n=== INÃCIO DO PROCESSAMENTO IA ===")
-    print(f"Recebido arquivo: {filename}")
-    try:
-        # Salvar arquivo temporÃ¡rio
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
-            tmp_file.write(content)
-            tmp_file_path = tmp_file.name
-        print(f"Arquivo temporÃ¡rio salvo em: {tmp_file_path}")
-        
+BASE_DIR = Path(__file__).resolve().parents[2]
+UPLOADS_DIR = BASE_DIR / settings.UPLOAD_DIR
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
+pdf_text_cache: Dict[str, str] = {}
+pdf_bytes_cache: Dict[str, bytes] = {}
+
+
+def _generate_session_id(filename: str) -> str:
+    stem = Path(filename).stem.replace(" ", "_")
+    return f"{stem}_{uuid.uuid4().hex}"
+
+
+def _persist_pdf(session_id: str, pdf_bytes: bytes) -> Path:
+    file_path = UPLOADS_DIR / f"{session_id}.pdf"
+    file_path.write_bytes(pdf_bytes)
+    print(f"DEBUG: PDF salvo em disco: {file_path}")
+    return file_path
+
+
+def _load_pdf_from_session(session_id: str) -> Optional[bytes]:
+    if session_id in pdf_bytes_cache:
+        return pdf_bytes_cache[session_id]
+    file_path = UPLOADS_DIR / f"{session_id}.pdf"
+    if file_path.exists():
+        data = file_path.read_bytes()
+        pdf_bytes_cache[session_id] = data
+        return data
+    return None
+
+
+def _merge_document_ai_data(base: dict, parsed: dict) -> None:
+    if not parsed:
+        return
+    for key in ["fornecedor", "cnpj_fornecedor", "numero_nota", "valor_total", "data_emissao", "endereco"]:
+        if parsed.get(key):
+            base[key] = parsed[key]
+    if parsed.get("itens"):
+        base["itens"] = parsed["itens"]
+
+
+def estruturar_dados_com_regex(texto: str) -> dict:
+    """Extrai dados básicos quando Document AI não estiver disponível."""
+    dados = {
+        "numero_nota": "",
+        "serie": "",
+        "chave_acesso": "",
+        "valor_total": 0.0,
+        "fornecedor": "",
+        "cnpj_fornecedor": "",
+        "data_emissao": "",
+        "endereco": "",
+        "itens": [],
+    }
+
+    cnpj_match = re.search(r"(\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2})", texto)
+    if cnpj_match:
+        dados["cnpj_fornecedor"] = cnpj_match.group(1).replace(".", "").replace("/", "").replace("-", "")
+
+    valor_match = re.search(r"valor total\s*[:\-]?\s*([\d.,]+)", texto, re.IGNORECASE)
+    if valor_match:
         try:
-            # Caminho do MCP (dentro do Docker)
-            # No Docker, o backend estÃ¡ em /app, entÃ£o o MCP estÃ¡ em ../mcp-server-pdf
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            project_root = os.path.abspath(os.path.join(current_dir, '..', '..', '..'))
-            mcp_path = os.path.join(project_root, 'mcp-server-pdf', 'index.js')
-            
-            print(f"DEBUG: Current dir: {current_dir}")
-            print(f"DEBUG: Project root: {project_root}")
-            print(f"DEBUG: Caminho MCP: {mcp_path}")
-            print(f"DEBUG: Arquivo existe? {os.path.exists(mcp_path)}")
+            dados["valor_total"] = float(valor_match.group(1).replace(".", "").replace(",", "."))
+        except ValueError:
+            pass
 
-            if not os.path.exists(mcp_path):
-                raise Exception(f"Arquivo MCP nÃ£o encontrado: {mcp_path}")
+    numero_match = re.search(r"nota\s*fiscal\s*(?:n[oº])?\s*[:\-]?\s*(\d+)", texto, re.IGNORECASE)
+    if numero_match:
+        dados["numero_nota"] = numero_match.group(1)
 
-            # Chamar MCP
-            print(f"Executando MCP: node {mcp_path} {tmp_file_path}")
+    data_match = re.search(r"(\d{2}/\d{2}/\d{4})", texto)
+    if data_match:
+        dados["data_emissao"] = data_match.group(1)
+
+    fornecedor_match = re.search(r"fornecedor\s*[:\-]?\s*([A-Z0-9\s\.\-&]+)", texto, re.IGNORECASE)
+    if fornecedor_match:
+        dados["fornecedor"] = fornecedor_match.group(1).strip()
+
+    return dados
+
+
+async def processar_pdf_com_ia(content: bytes, filename: str) -> dict:
+    """Processa PDF usando Document AI (Invoice Parser) com fallback em regex."""
+    print("\n=== INÍCIO DO PROCESSAMENTO IA ===")
+    print(f"Recebido arquivo: {filename}")
+
+    session_id = _generate_session_id(filename)
+    pdf_bytes_cache[session_id] = content
+    pdf_path = _persist_pdf(session_id, content)
+
+    texto_extraido = ""
+    dados_estruturados = {
+        "numero_nota": "000000",
+        "serie": "",
+        "chave_acesso": "",
+        "valor_total": 0.0,
+        "fornecedor": "",
+        "cnpj_fornecedor": "",
+        "data_emissao": "",
+        "endereco": "",
+        "itens": [],
+    }
+
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+            tmp_file.write(content)
+            tmp_path = tmp_file.name
+
+        current_dir = Path(__file__).resolve().parent
+        mcp_path = BASE_DIR / "mcp-server-pdf" / "index.js"
+        if mcp_path.exists():
+            print(f"DEBUG: Executando MCP: node {mcp_path} {tmp_path}")
             result = subprocess.run(
-                ['node', mcp_path, tmp_file_path],
+                ["node", str(mcp_path), tmp_path],
                 capture_output=True,
                 universal_newlines=False,
                 check=False,
-                cwd=project_root
+                cwd=BASE_DIR,
             )
 
-            # Decodificar stdout e stderr manualmente
-            try:
-                stdout_text = result.stdout.decode('utf-8', errors='replace')
-            except UnicodeDecodeError:
-                stdout_text = result.stdout.decode('latin-1', errors='replace')
+            stdout_text = result.stdout.decode("utf-8", errors="replace") if result.stdout else ""
+            stderr_text = result.stderr.decode("utf-8", errors="replace") if result.stderr else ""
+            print(f"Código de retorno MCP: {result.returncode}")
+            print(f"MCP stdout (primeiros 200 chars): {stdout_text[:200]}...")
+            if result.returncode == 0 and stdout_text:
+                try:
+                    mcp_data = json.loads(stdout_text)
+                    texto_extraido = mcp_data.get("text", "")
+                    texto_extraido = unidecode(texto_extraido)
+                    texto_extraido = re.sub(r"[^\x00-\x7F]+", "", texto_extraido)
+                    texto_extraido = re.sub(r"\s+", " ", texto_extraido).strip()
+                    dados_estruturados = estruturar_dados_com_regex(texto_extraido)
+                    print(f"DEBUG: Dados estruturados por regex: {dados_estruturados}")
+                except json.JSONDecodeError as e:
+                    print(f"AVISO: Erro ao parsear JSON do MCP: {e}")
+            else:
+                print(f"AVISO: MCP retornou erro: {stderr_text}")
+        else:
+            print(f"AVISO: Script MCP não encontrado em {mcp_path}")
+    finally:
+        if "tmp_path" in locals() and Path(tmp_path).exists():
+            Path(tmp_path).unlink()
+            print(f"Arquivo temporário removido: {tmp_path}")
 
-            try:
-                stderr_text = result.stderr.decode('utf-8', errors='replace')
-            except UnicodeDecodeError:
-                stderr_text = result.stderr.decode('latin-1', errors='replace')
+    pdf_text_cache[session_id] = texto_extraido
 
-            print(f"CÃ³digo de retorno: {result.returncode}")
-            print(f"Stdout (primeiros 200 chars): {stdout_text[:200]}...")
-            print(f"Stderr: {stderr_text}")
-
-            if result.returncode != 0:
-                raise Exception(f"Erro no script MCP: {stderr_text}")
-            
-            if not stdout_text or stdout_text.strip() == "":
-                raise Exception("MCP nÃ£o retornou nenhum texto.")
-
-            # Parse do resultado JSON do MCP
-            mcp_data = None
-            try:
-                mcp_data = json.loads(stdout_text)
-                print(f"DEBUG: mcp_data parseado: {mcp_data}")
-            except json.JSONDecodeError as e:
-                print(f"DEBUG: Erro ao parsear JSON: {e}")
-                print(f"DEBUG: Raw stdout: {stdout_text}")
-                raise Exception(f"Erro ao parsear JSON do MCP: {e}. SaÃ­da: {stdout_text[:200]}")
-            
-            if mcp_data is None:
-                raise Exception("MCP retornou None apÃ³s parse.")
-                
-            texto_extraido = mcp_data.get('text', '')
-            
-            # Limpar texto extraÃ­do para remover caracteres problemÃ¡ticos
-            texto_extraido = unidecode(texto_extraido)
-            texto_extraido = re.sub(r'[^\x00-\x7F]+', '', texto_extraido)
-            texto_extraido = re.sub(r'\s+', ' ', texto_extraido).strip()
-
-            print(f"DEBUG: Texto extraÃ­do (primeiros 100 chars): {texto_extraido[:100]}...")
-            
-            # Usar IA para estruturar os dados
-            dados_estruturados = estruturar_dados_com_ia(texto_extraido)
-            print(f"DEBUG: Dados estruturados: {dados_estruturados}")
-            
-            resultado_final = {
-                "success": True,
-                "method": "ai_fallback",
-                "dados_extraidos": dados_estruturados,
-                "message": f"PDF processado com IA! {len(dados_estruturados.get('itens', []))} itens encontrados."
-            }
-            print(f"DEBUG: Retorno final do backend: {resultado_final}")
-            return resultado_final
-            
-        finally:
-            # Limpar arquivo temporÃ¡rio
-            if os.path.exists(tmp_file_path):
-                os.unlink(tmp_file_path)
-            print(f"Arquivo temporÃ¡rio removido: {tmp_file_path}")
-            
-    except Exception as e:
-        print(f"ERROR: Erro completo no processamento IA: {str(e)}")
-        return {
-            "success": False,
-            "method": "ai_fallback",
-            "message": f"Erro ao processar com IA: {str(e)}"
-        }
-
-def estruturar_dados_com_ia(texto: str) -> dict:
-    """Extrai dados usando regex inteligente"""
-    print(f"DEBUG: Estruturando dados com IA (regex) do texto: {texto[:100]}...")
-    
-    dados = {
-        "numero_nota": "000000",
-        "serie": "1",
-        "chave_acesso": "",
-        "valor_total": 0.0,
-        "fornecedor": "Fornecedor nÃ£o identificado",
-        "cnpj_fornecedor": "00000000000000",
-        "data_emissao": "",
-        "endereco": "",
-        "itens": []
-    }
-    
-    # CNPJ
-    cnpj_match = re.search(r'(\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2})', texto)
-    if cnpj_match:
-        dados["cnpj_fornecedor"] = cnpj_match.group(1).replace('.', '').replace('/', '').replace('-', '')
-    
-    # Valor total
-    valor_match = re.search(r'Total.*?R\$\s*([\d.,]+)', texto, re.IGNORECASE)
-    if valor_match:
+    method = "regex_fallback"
+    docai_error: Optional[str] = None
+    if settings.USE_DOCUMENT_AI:
         try:
-            valor_str = valor_match.group(1).replace('.', '').replace(',', '.')
-            dados["valor_total"] = float(valor_str)
-        except:
-            pass
-    
-    # NÃºmero da nota
-    numero_match = re.search(r'Nota.*?(\d+)', texto, re.IGNORECASE)
-    if numero_match:
-        dados["numero_nota"] = numero_match.group(1)
-    
-    # Data
-    data_match = re.search(r'(\d{2}/\d{2}/\d{4})', texto)
-    if data_match:
-        dados["data_emissao"] = data_match.group(1)
-    
-    print(f"DEBUG: Dados extraÃ­dos por regex: {dados}")
-    return dados
+            document = process_invoice_pdf(content)
+            parsed = parse_invoice_document(document)
+            _merge_document_ai_data(dados_estruturados, parsed)
+            method = "document_ai"
+        except Exception as exc:
+            docai_error = str(exc)
+            print(f"AVISO: Document AI falhou: {docai_error}")
+
+    message = (
+        "PDF processado com Document AI!"
+        if method == "document_ai"
+        else "PDF processado com regex! Dados limitados."
+    )
+
+    resultado_final = {
+        "success": True,
+        "method": method,
+        "session_id": session_id,
+        "dados_extraidos": dados_estruturados,
+        "message": message,
+    }
+
+    if docai_error:
+        resultado_final["docai_error"] = docai_error
+
+    print(f"DEBUG: Retorno final do backend: {resultado_final}")
+    return resultado_final
+
 
 @router.post("/processar-pdf")
 async def processar_pdf_com_ia_endpoint(file: UploadFile = File(...)):
-    """Endpoint para processar PDF com IA"""
-    print(f"Recebida requisiÃ§Ã£o para /uploads-ia/processar-pdf para {file.filename}")
-    
     if not file.filename or not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Apenas arquivos PDF sÃ£o aceitos")
-    
+        raise HTTPException(status_code=400, detail="Apenas arquivos PDF são aceitos.")
     content = await file.read()
     resultado = await processar_pdf_com_ia(content, file.filename)
-    
-    print(f"DEBUG: Retornando resultado do endpoint: {resultado['success']}")
     return resultado
+
+
+class ReextrairCampoRequest(BaseModel):
+    session_id: str
+    campo: str
+
+
+@router.post("/reextrair-campo")
+async def reextrair_campo_endpoint(payload: ReextrairCampoRequest):
+    campo = payload.campo.lower()
+    pdf_bytes = _load_pdf_from_session(payload.session_id)
+    if not pdf_bytes:
+        raise HTTPException(status_code=404, detail=f"Arquivo não encontrado: {payload.session_id}")
+
+    try:
+        document = process_invoice_pdf(pdf_bytes)
+        parsed = parse_invoice_document(document)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Erro no Document AI: {exc}") from exc
+
+    if campo == "itens":
+        itens = parsed.get("itens", [])
+        if not itens:
+            raise HTTPException(status_code=422, detail="Nenhum item encontrado pelo Document AI.")
+        return {"ok": True, "campo": "itens", "itens": itens, "method": "document_ai"}
+
+    if campo not in parsed:
+        raise HTTPException(status_code=404, detail=f"Campo '{campo}' não disponível.")
+
+    return {"ok": True, "campo": campo, "valor": parsed.get(campo), "method": "document_ai"}

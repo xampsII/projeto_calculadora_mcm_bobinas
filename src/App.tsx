@@ -23,8 +23,8 @@ function App() {
   };
 
   const handleVerNota = (id: string) => {
-    // TODO: Implementar tela de detalhes
-    console.log('Ver nota:', id);
+    setNotaEditandoId(id);
+    setActiveTab('cadastro');
   };
 
   const handleVoltarParaLista = () => {

@@ -208,3 +208,7 @@ docker-compose exec backend python -c "from app.api.notas import normalizar_nome
 
 **O problema é 99% certeza que o Docker não foi atualizado!** 🎯
 
+
+
+
+

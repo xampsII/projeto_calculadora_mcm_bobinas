@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     # Pydantic também lê o mesmo .env da raiz
     model_config = SettingsConfigDict(env_file=str(ENV_PATH), extra="ignore")
 
+    PROJECT_ROOT: Path = PROJECT_ROOT
+
     # URL pronta (opção preferida)
     DATABASE_URL: Optional[str] = "sqlite:///./nfe_system.db"
 
@@ -65,6 +67,13 @@ class Settings(BaseSettings):
     # ---- API Server ----
     API_HOST: str = "0.0.0.0"
     API_PORT: int = 8000
+
+    # ---- Document AI / IA ----
+    GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = None
+    GCP_PROJECT_ID: Optional[str] = None
+    GCP_LOCATION: str = "us"
+    GCP_PROCESSOR_ID_INVOICE: Optional[str] = None
+    USE_DOCUMENT_AI: bool = True
 
     @property
     def cors_origins_list(self) -> list[str]:

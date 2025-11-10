@@ -67,6 +67,11 @@ venv.bak/
 backend/uploads/*
 !backend/uploads/.gitkeep
 
+# Credentials
+backend/credentials/*
+# keep directory
+!backend/credentials/.gitkeep
+
 # IDE
 .vscode/
 .idea/
